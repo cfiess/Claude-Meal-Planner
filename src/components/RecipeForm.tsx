@@ -150,6 +150,47 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
             {existingRecipe ? 'Edit Recipe' : 'Add Recipe'}
           </h2>
 
+          {/* Import from URL - only show for new recipes */}
+          {!existingRecipe && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <label className="block text-sm font-medium text-green-800 mb-2">
+                Import from URL
+              </label>
+              <p className="text-sm text-green-700 mb-2">
+                Paste a recipe URL and we'll try to extract the ingredients and steps automatically.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={link}
+                  onChange={e => setLink(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-green-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                  placeholder="Paste recipe URL here..."
+                />
+                <button
+                  type="button"
+                  onClick={handleParseUrl}
+                  disabled={isParsing || !link}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isParsing ? 'Importing...' : 'Import'}
+                </button>
+              </div>
+              {parseError && (
+                <p className="mt-2 text-sm text-amber-600">{parseError}</p>
+              )}
+            </div>
+          )}
+
+          {/* Divider for new recipes */}
+          {!existingRecipe && (
+            <div className="flex items-center mb-4">
+              <div className="flex-1 border-t border-gray-300"></div>
+              <span className="px-3 text-sm text-gray-500">or enter manually</span>
+              <div className="flex-1 border-t border-gray-300"></div>
+            </div>
+          )}
+
           {/* Name */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -165,10 +206,10 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
             />
           </div>
 
-          {/* Link with Parse Button */}
+          {/* Link field - for editing or to show/modify the saved link */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Recipe Link (optional)
+              Recipe Link {existingRecipe ? '' : '(saved from import or add your own)'}
             </label>
             <div className="flex gap-2">
               <input
@@ -178,16 +219,18 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="https://..."
               />
-              <button
-                type="button"
-                onClick={handleParseUrl}
-                disabled={isParsing || !link}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isParsing ? 'Parsing...' : 'Parse'}
-              </button>
+              {existingRecipe && (
+                <button
+                  type="button"
+                  onClick={handleParseUrl}
+                  disabled={isParsing || !link}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isParsing ? 'Parsing...' : 'Re-parse'}
+                </button>
+              )}
             </div>
-            {parseError && (
+            {existingRecipe && parseError && (
               <p className="mt-1 text-sm text-amber-600">{parseError}</p>
             )}
           </div>
