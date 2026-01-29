@@ -199,3 +199,93 @@ export async function parseRecipeFromUrl(url: string): Promise<ParsedRecipe | nu
     return null;
   }
 }
+
+export function parseRecipeFromText(text: string): ParsedRecipe | null {
+  if (!text.trim()) return null;
+
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  const parsed: ParsedRecipe = {};
+  const ingredientLines: string[] = [];
+  const stepLines: string[] = [];
+
+  let currentSection: 'unknown' | 'ingredients' | 'instructions' = 'unknown';
+
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+
+    // Detect section headers
+    if (lowerLine.includes('ingredient')) {
+      currentSection = 'ingredients';
+      continue;
+    }
+    if (
+      lowerLine.includes('instruction') ||
+      lowerLine.includes('direction') ||
+      lowerLine.includes('method') ||
+      lowerLine.includes('steps')
+    ) {
+      currentSection = 'instructions';
+      continue;
+    }
+
+    // If first non-header line and no name yet, treat as recipe name
+    if (!parsed.name && currentSection === 'unknown') {
+      // Skip lines that look like ingredients or steps
+      const looksLikeIngredient = /^\d|^[-•*]/.test(line);
+      if (!looksLikeIngredient && line.length < 100) {
+        parsed.name = line;
+        continue;
+      }
+    }
+
+    // Clean up list markers
+    const cleanedLine = line
+      .replace(/^[-•*]\s*/, '')
+      .replace(/^\d+[.)]\s*/, '')
+      .trim();
+
+    if (!cleanedLine) continue;
+
+    // Try to intelligently categorize if section is unknown
+    if (currentSection === 'unknown') {
+      // Lines starting with numbers/fractions followed by units are likely ingredients
+      const looksLikeIngredient = /^[\d½¼¾⅓⅔⅛]/.test(cleanedLine) ||
+        /^(one|two|three|four|five|six|a|an)\s/i.test(cleanedLine);
+      // Longer lines with verbs are likely instructions
+      const looksLikeStep = cleanedLine.length > 50 ||
+        /^(preheat|mix|add|stir|cook|bake|heat|combine|pour|place|set|let|bring|cut|chop|slice)/i.test(cleanedLine);
+
+      if (looksLikeIngredient && !looksLikeStep) {
+        ingredientLines.push(cleanedLine);
+      } else if (looksLikeStep) {
+        stepLines.push(cleanedLine);
+      } else if (ingredientLines.length > 0 && stepLines.length === 0) {
+        // If we've started collecting ingredients, keep adding until we hit steps
+        ingredientLines.push(cleanedLine);
+      } else if (stepLines.length > 0) {
+        stepLines.push(cleanedLine);
+      }
+    } else if (currentSection === 'ingredients') {
+      ingredientLines.push(cleanedLine);
+    } else if (currentSection === 'instructions') {
+      stepLines.push(cleanedLine);
+    }
+  }
+
+  if (ingredientLines.length > 0) {
+    parsed.ingredients = ingredientLines.map(line => parseIngredientString(line));
+  }
+
+  if (stepLines.length > 0) {
+    parsed.steps = stepLines;
+  }
+
+  // Only return if we parsed something useful
+  if (parsed.name || parsed.ingredients?.length || parsed.steps?.length) {
+    return parsed;
+  }
+
+  return null;
+}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Recipe, Ingredient, GroceryCategory } from '../types';
 import { useMealPlanner } from '../context/MealPlannerContext';
 import { isValidUrl } from '../utils/helpers';
-import { parseRecipeFromUrl } from '../utils/recipeParser';
+import { parseRecipeFromUrl, parseRecipeFromText } from '../utils/recipeParser';
 
 interface RecipeFormProps {
   existingRecipe?: Recipe;
@@ -36,6 +36,8 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const [newTag, setNewTag] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [textParseError, setTextParseError] = useState('');
 
   const handleAddIngredient = () => {
     setIngredients([
@@ -85,6 +87,27 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
       addTag(newTag.trim());
       setSelectedTags([...selectedTags, newTag.trim()]);
       setNewTag('');
+    }
+  };
+
+  const handleParseText = () => {
+    if (!pastedText.trim()) {
+      setTextParseError('Please paste some recipe text first');
+      return;
+    }
+
+    setTextParseError('');
+
+    const parsed = parseRecipeFromText(pastedText);
+    if (parsed) {
+      if (parsed.name && !name) setName(parsed.name);
+      if (parsed.ingredients?.length) setIngredients(parsed.ingredients);
+      if (parsed.steps?.length) setSteps(parsed.steps);
+      setPastedText(''); // Clear after successful parse
+    } else {
+      setTextParseError(
+        'Could not parse recipe from text. Try adding ingredients and steps manually below.'
+      );
     }
   };
 
@@ -178,6 +201,36 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
               </div>
               {parseError && (
                 <p className="mt-2 text-sm text-amber-600">{parseError}</p>
+              )}
+            </div>
+          )}
+
+          {/* Paste Recipe Text - only show for new recipes */}
+          {!existingRecipe && (
+            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <label className="block text-sm font-medium text-purple-800 mb-2">
+                Paste Recipe Text
+              </label>
+              <p className="text-sm text-purple-700 mb-2">
+                Copy a recipe from a cookbook, Google Doc, or anywhere else and paste it here.
+              </p>
+              <textarea
+                value={pastedText}
+                onChange={e => setPastedText(e.target.value)}
+                className="w-full px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white mb-2"
+                placeholder="Paste your recipe here...&#10;&#10;Example:&#10;Ingredients:&#10;2 cups flour&#10;1 tsp salt&#10;&#10;Instructions:&#10;1. Mix ingredients..."
+                rows={6}
+              />
+              <button
+                type="button"
+                onClick={handleParseText}
+                disabled={!pastedText.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Parse Recipe
+              </button>
+              {textParseError && (
+                <p className="mt-2 text-sm text-amber-600">{textParseError}</p>
               )}
             </div>
           )}
