@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { MealPlannerProvider } from './context/MealPlannerContext';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { RecipeBook } from './components/RecipeBook';
+import { ShoppingList } from './components/ShoppingList';
 
-type Tab = 'planner' | 'recipes';
+type Tab = 'planner' | 'recipes' | 'shopping';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('planner');
@@ -37,6 +38,16 @@ function App() {
                 >
                   Recipe Book
                 </button>
+                <button
+                  onClick={() => setActiveTab('shopping')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === 'shopping'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Shopping List
+                </button>
               </nav>
             </div>
           </div>
@@ -46,6 +57,7 @@ function App() {
         <main className="max-w-7xl mx-auto">
           {activeTab === 'planner' && <WeeklyPlanner />}
           {activeTab === 'recipes' && <RecipeBook />}
+          {activeTab === 'shopping' && <ShoppingList />}
         </main>
       </div>
     </MealPlannerProvider>
