@@ -7,6 +7,7 @@ interface AggregatedItem {
   amounts: string[];
   category: string;
   key: string;
+  isManual?: boolean;
 }
 
 const INITIAL_CATEGORIES = [
@@ -38,6 +39,12 @@ const LEGACY_CATEGORY_MAP: Record<string, string> = {
 const CHECKED_STORAGE_KEY = 'shopping-list-checked';
 const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
 const CATEGORIES_KEY = 'shopping-list-categories';
+const MANUAL_ITEMS_KEY = 'shopping-list-manual-items';
+
+interface ManualItem {
+  name: string;
+  category: string;
+}
 
 export function ShoppingList() {
   const { state, getRecipeById } = useMealPlanner();
@@ -83,11 +90,30 @@ export function ShoppingList() {
     return INITIAL_CATEGORIES;
   });
 
+  // Manual items (user-added, not from recipes)
+  const [manualItems, setManualItems] = useState<ManualItem[]>(() => {
+    const stored = localStorage.getItem(MANUAL_ITEMS_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.weekStartDate === state.currentWeek.weekStartDate) {
+          return parsed.items;
+        }
+      } catch {
+        // Invalid data
+      }
+    }
+    return [];
+  });
+
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('Other');
 
   // Save to localStorage
   useEffect(() => {
@@ -107,6 +133,16 @@ export function ShoppingList() {
   useEffect(() => {
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
   }, [categories]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      MANUAL_ITEMS_KEY,
+      JSON.stringify({
+        weekStartDate: state.currentWeek.weekStartDate,
+        items: manualItems,
+      })
+    );
+  }, [manualItems, state.currentWeek.weekStartDate]);
 
   // Collect all ingredients from planned meals
   const allIngredients: Ingredient[] = [];
@@ -151,6 +187,28 @@ export function ShoppingList() {
         amounts: amountStr ? [amountStr] : [],
         category,
         key: normalizedName,
+      });
+    }
+  });
+
+  // Add manual items to the map
+  manualItems.forEach(item => {
+    const normalizedName = item.name.toLowerCase().trim();
+    const key = `manual-${normalizedName}`;
+
+    // Don't add if already exists from recipes
+    if (!aggregatedMap.has(normalizedName)) {
+      let category = item.category;
+      if (!categories.includes(category)) {
+        category = 'Other';
+      }
+
+      aggregatedMap.set(key, {
+        name: item.name,
+        amounts: [],
+        category,
+        key,
+        isManual: true,
       });
     }
   });
@@ -278,6 +336,30 @@ export function ShoppingList() {
     setEditingCategory(null);
   };
 
+  const handleAddItem = () => {
+    const trimmed = newItemName.trim();
+    if (!trimmed) return;
+
+    // Check if already exists
+    const normalizedName = trimmed.toLowerCase();
+    const alreadyExists = manualItems.some(
+      item => item.name.toLowerCase() === normalizedName
+    );
+
+    if (!alreadyExists) {
+      setManualItems(prev => [...prev, { name: trimmed, category: newItemCategory }]);
+    }
+
+    setNewItemName('');
+    setShowAddItem(false);
+  };
+
+  const handleRemoveManualItem = (itemName: string) => {
+    setManualItems(prev =>
+      prev.filter(item => item.name.toLowerCase() !== itemName.toLowerCase())
+    );
+  };
+
   const totalItems = aggregatedMap.size;
   const checkedCount = checkedItems.size;
   const hasItems = totalItems > 0;
@@ -293,7 +375,53 @@ export function ShoppingList() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          {showAddItem ? (
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={newItemName}
+                onChange={e => setNewItemName(e.target.value)}
+                placeholder="Item name..."
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddItem();
+                  if (e.key === 'Escape') setShowAddItem(false);
+                }}
+                autoFocus
+              />
+              <select
+                value={newItemCategory}
+                onChange={e => setNewItemCategory(e.target.value)}
+                className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleAddItem}
+                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Add
+              </button>
+              <button
+                onClick={() => setShowAddItem(false)}
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddItem(true)}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              +Add Item
+            </button>
+          )}
           {showAddCategory ? (
             <div className="flex gap-2">
               <input
@@ -310,7 +438,7 @@ export function ShoppingList() {
               />
               <button
                 onClick={handleAddCategory}
-                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
               >
                 Add
               </button>
@@ -342,9 +470,9 @@ export function ShoppingList() {
 
       {!hasItems ? (
         <div className="text-center py-12 text-gray-500">
-          <p className="mb-2">No ingredients to shop for yet.</p>
+          <p className="mb-2">No items on your shopping list yet.</p>
           <p className="text-sm">
-            Add meals with ingredients to your weekly plan to generate a shopping list.
+            Add meals with ingredients to your weekly plan, or click +Add Item to add items manually.
           </p>
         </div>
       ) : (
@@ -452,6 +580,15 @@ export function ShoppingList() {
                             title="Change category"
                           >
                             Move
+                          </button>
+                        )}
+                        {item.isManual && (
+                          <button
+                            onClick={() => handleRemoveManualItem(item.name)}
+                            className="text-xs text-red-400 hover:text-red-600 px-1"
+                            title="Remove item"
+                          >
+                            X
                           </button>
                         )}
                       </li>
