@@ -9,7 +9,7 @@ interface AggregatedItem {
   key: string;
 }
 
-const DEFAULT_CATEGORIES = [
+const INITIAL_CATEGORIES = [
   'Produce',
   'Meat & Seafood',
   'Dairy & Eggs',
@@ -37,7 +37,7 @@ const LEGACY_CATEGORY_MAP: Record<string, string> = {
 
 const CHECKED_STORAGE_KEY = 'shopping-list-checked';
 const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
-const CUSTOM_CATEGORIES_KEY = 'shopping-list-custom-categories';
+const CATEGORIES_KEY = 'shopping-list-categories';
 
 export function ShoppingList() {
   const { state, getRecipeById } = useMealPlanner();
@@ -70,9 +70,9 @@ export function ShoppingList() {
     return {};
   });
 
-  // Custom categories added by user
-  const [customCategories, setCustomCategories] = useState<string[]>(() => {
-    const stored = localStorage.getItem(CUSTOM_CATEGORIES_KEY);
+  // All categories (user can add, rename, delete)
+  const [categories, setCategories] = useState<string[]>(() => {
+    const stored = localStorage.getItem(CATEGORIES_KEY);
     if (stored) {
       try {
         return JSON.parse(stored);
@@ -80,15 +80,14 @@ export function ShoppingList() {
         // Invalid data
       }
     }
-    return [];
+    return INITIAL_CATEGORIES;
   });
 
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
-
-  // All available categories
-  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
 
   // Save to localStorage
   useEffect(() => {
@@ -106,8 +105,8 @@ export function ShoppingList() {
   }, [categoryOverrides]);
 
   useEffect(() => {
-    localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(customCategories));
-  }, [customCategories]);
+    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+  }, [categories]);
 
   // Collect all ingredients from planned meals
   const allIngredients: Ingredient[] = [];
@@ -140,7 +139,12 @@ export function ShoppingList() {
     } else {
       // Use override if exists, otherwise map legacy category to display name
       const baseCategory = LEGACY_CATEGORY_MAP[ingredient.category] || ingredient.category;
-      const category = categoryOverrides[normalizedName] || baseCategory;
+      let category = categoryOverrides[normalizedName] || baseCategory;
+
+      // If category doesn't exist anymore, fall back to Other
+      if (!categories.includes(category)) {
+        category = 'Other';
+      }
 
       aggregatedMap.set(normalizedName, {
         name: ingredient.name,
@@ -155,7 +159,7 @@ export function ShoppingList() {
   const groupedItems: Record<string, AggregatedItem[]> = {};
 
   // Initialize all categories
-  allCategories.forEach(cat => {
+  categories.forEach(cat => {
     groupedItems[cat] = [];
   });
 
@@ -172,7 +176,7 @@ export function ShoppingList() {
   });
 
   // Get categories that have items, in order
-  const categoriesWithItems = allCategories.filter(cat => groupedItems[cat]?.length > 0);
+  const categoriesWithItems = categories.filter(cat => groupedItems[cat]?.length > 0);
 
   const handleToggleItem = (key: string) => {
     setCheckedItems(prev => {
@@ -200,11 +204,78 @@ export function ShoppingList() {
 
   const handleAddCategory = () => {
     const trimmed = newCategoryName.trim();
-    if (trimmed && !allCategories.includes(trimmed)) {
-      setCustomCategories(prev => [...prev, trimmed]);
+    if (trimmed && !categories.includes(trimmed)) {
+      setCategories(prev => [...prev, trimmed]);
       setNewCategoryName('');
       setShowAddCategory(false);
     }
+  };
+
+  const handleStartEditCategory = (category: string) => {
+    setEditingCategory(category);
+    setEditingCategoryName(category);
+  };
+
+  const handleSaveCategory = () => {
+    if (!editingCategory) return;
+
+    const trimmed = editingCategoryName.trim();
+    if (!trimmed) {
+      setEditingCategory(null);
+      return;
+    }
+
+    // If name changed
+    if (trimmed !== editingCategory) {
+      // Check if new name already exists
+      if (categories.includes(trimmed)) {
+        alert('A category with this name already exists');
+        return;
+      }
+
+      // Update categories list
+      setCategories(prev => prev.map(c => (c === editingCategory ? trimmed : c)));
+
+      // Update all item overrides that reference the old category
+      setCategoryOverrides(prev => {
+        const updated = { ...prev };
+        for (const key in updated) {
+          if (updated[key] === editingCategory) {
+            updated[key] = trimmed;
+          }
+        }
+        return updated;
+      });
+    }
+
+    setEditingCategory(null);
+  };
+
+  const handleDeleteCategory = (category: string) => {
+    if (category === 'Other') {
+      alert('Cannot delete the "Other" category');
+      return;
+    }
+
+    if (!confirm(`Delete "${category}"? Items will be moved to "Other".`)) {
+      return;
+    }
+
+    // Remove category
+    setCategories(prev => prev.filter(c => c !== category));
+
+    // Move items in this category to "Other"
+    setCategoryOverrides(prev => {
+      const updated = { ...prev };
+      for (const key in updated) {
+        if (updated[key] === category) {
+          updated[key] = 'Other';
+        }
+      }
+      return updated;
+    });
+
+    setEditingCategory(null);
   };
 
   const totalItems = aggregatedMap.size;
@@ -280,12 +351,55 @@ export function ShoppingList() {
         <div className="space-y-6">
           {categoriesWithItems.map(category => {
             const items = groupedItems[category];
+            const isEditingThisCategory = editingCategory === category;
 
             return (
               <div key={category}>
-                <h3 className="font-semibold text-gray-700 mb-2 pb-1 border-b border-gray-200">
-                  {category}
-                </h3>
+                <div className="flex items-center justify-between mb-2 pb-1 border-b border-gray-200">
+                  {isEditingThisCategory ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingCategoryName}
+                        onChange={e => setEditingCategoryName(e.target.value)}
+                        className="font-semibold text-gray-700 px-2 py-1 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveCategory();
+                          if (e.key === 'Escape') setEditingCategory(null);
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveCategory}
+                        className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(category)}
+                        className="text-xs px-2 py-1 text-red-600 hover:text-red-800"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setEditingCategory(null)}
+                        className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="font-semibold text-gray-700">{category}</h3>
+                      <button
+                        onClick={() => handleStartEditCategory(category)}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                </div>
                 <ul className="space-y-1">
                   {items.map(item => {
                     const isChecked = checkedItems.has(item.key);
@@ -325,7 +439,7 @@ export function ShoppingList() {
                             className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             autoFocus
                           >
-                            {allCategories.map(cat => (
+                            {categories.map(cat => (
                               <option key={cat} value={cat}>
                                 {cat}
                               </option>
