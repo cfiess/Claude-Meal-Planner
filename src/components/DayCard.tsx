@@ -180,7 +180,7 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
                 onClick={handleAddLink}
                 className="text-sm text-gray-500 hover:text-gray-700"
               >
-                + Add link
+                +Add Link
               </button>
             )}
 
@@ -191,16 +191,16 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
                 onChange={e => setNotesInput(e.target.value)}
                 onBlur={handleNotesBlur}
                 placeholder="Add notes..."
-                className="w-full px-2 py-1 text-sm border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full px-2 py-1 text-sm border border-gray-200 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 mt-2"
                 rows={2}
               />
             )}
             {!plan.dinner.notes && !showNotes && (
               <button
                 onClick={() => setShowNotes(true)}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="block text-sm text-gray-500 hover:text-gray-700 mt-2"
               >
-                + Add notes
+                +Add Notes
               </button>
             )}
           </div>
