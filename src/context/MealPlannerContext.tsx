@@ -71,6 +71,7 @@ type Action =
   | { type: 'SET_DAY_LUNCH'; day: DayOfWeek; lunch: string }
   | { type: 'ADD_TAG'; tag: string }
   | { type: 'REMOVE_TAG'; tag: string }
+  | { type: 'UPDATE_TAG'; oldTag: string; newTag: string }
   | { type: 'INCREMENT_TIMES_COOKED'; recipeId: string }
   | { type: 'LOAD_STATE'; state: MealPlannerState };
 
@@ -139,6 +140,24 @@ function reducer(state: MealPlannerState, action: Action): MealPlannerState {
       return {
         ...state,
         availableTags: state.availableTags.filter(t => t !== action.tag),
+        // Also remove from all recipes
+        recipes: state.recipes.map(r => ({
+          ...r,
+          tags: r.tags.filter(t => t !== action.tag),
+        })),
+      };
+
+    case 'UPDATE_TAG':
+      return {
+        ...state,
+        availableTags: state.availableTags.map(t =>
+          t === action.oldTag ? action.newTag : t
+        ),
+        // Also update in all recipes
+        recipes: state.recipes.map(r => ({
+          ...r,
+          tags: r.tags.map(t => (t === action.oldTag ? action.newTag : t)),
+        })),
       };
 
     case 'INCREMENT_TIMES_COOKED':
@@ -168,6 +187,7 @@ interface MealPlannerContextValue {
   setDayLunch: (day: DayOfWeek, lunch: string) => void;
   addTag: (tag: string) => void;
   removeTag: (tag: string) => void;
+  updateTag: (oldTag: string, newTag: string) => void;
   incrementTimesCooked: (recipeId: string) => void;
   getRecipeById: (id: string) => Recipe | undefined;
 }
@@ -218,6 +238,10 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'REMOVE_TAG', tag });
   };
 
+  const updateTag = (oldTag: string, newTag: string) => {
+    dispatch({ type: 'UPDATE_TAG', oldTag, newTag });
+  };
+
   const incrementTimesCooked = (recipeId: string) => {
     dispatch({ type: 'INCREMENT_TIMES_COOKED', recipeId });
   };
@@ -237,6 +261,7 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
         setDayLunch,
         addTag,
         removeTag,
+        updateTag,
         incrementTimesCooked,
         getRecipeById,
       }}

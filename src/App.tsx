@@ -3,8 +3,9 @@ import { MealPlannerProvider } from './context/MealPlannerContext';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { RecipeBook } from './components/RecipeBook';
 import { ShoppingList } from './components/ShoppingList';
+import { Admin } from './components/Admin';
 
-type Tab = 'planner' | 'recipes' | 'shopping';
+type Tab = 'planner' | 'recipes' | 'shopping' | 'admin';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('planner');
@@ -48,6 +49,16 @@ function App() {
                 >
                   Shopping List
                 </button>
+                <button
+                  onClick={() => setActiveTab('admin')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === 'admin'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Settings
+                </button>
               </nav>
             </div>
           </div>
@@ -58,6 +69,7 @@ function App() {
           {activeTab === 'planner' && <WeeklyPlanner />}
           {activeTab === 'recipes' && <RecipeBook />}
           {activeTab === 'shopping' && <ShoppingList />}
+          {activeTab === 'admin' && <Admin />}
         </main>
       </div>
     </MealPlannerProvider>

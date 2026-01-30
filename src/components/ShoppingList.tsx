@@ -40,6 +40,7 @@ const CHECKED_STORAGE_KEY = 'shopping-list-checked';
 const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
 const CATEGORIES_KEY = 'shopping-list-categories';
 const MANUAL_ITEMS_KEY = 'shopping-list-manual-items';
+const SHOPPING_HISTORY_KEY = 'shopping-list-history';
 
 interface ManualItem {
   name: string;
@@ -238,13 +239,18 @@ export function ShoppingList() {
   // Get categories that have items, in order
   const categoriesWithItems = categories.filter(cat => groupedItems[cat]?.length > 0);
 
-  const handleToggleItem = (key: string) => {
+  const handleToggleItem = (key: string, itemName: string) => {
     setCheckedItems(prev => {
       const newSet = new Set(prev);
       if (newSet.has(key)) {
         newSet.delete(key);
       } else {
         newSet.add(key);
+        // Track in cumulative shopping history when item is checked
+        const history = JSON.parse(localStorage.getItem(SHOPPING_HISTORY_KEY) || '{}');
+        const normalizedName = itemName.toLowerCase().trim();
+        history[normalizedName] = (history[normalizedName] || 0) + 1;
+        localStorage.setItem(SHOPPING_HISTORY_KEY, JSON.stringify(history));
       }
       return newSet;
     });
@@ -552,7 +558,7 @@ export function ShoppingList() {
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => handleToggleItem(item.key)}
+                            onChange={() => handleToggleItem(item.key, item.name)}
                             className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                           />
                           <span
