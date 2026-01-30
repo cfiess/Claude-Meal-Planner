@@ -44,6 +44,7 @@ const MANUAL_ITEMS_KEY = 'shopping-list-manual-items';
 interface ManualItem {
   name: string;
   category: string;
+  quantity?: string;
 }
 
 export function ShoppingList() {
@@ -113,6 +114,7 @@ export function ShoppingList() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemName, setNewItemName] = useState('');
+  const [newItemQty, setNewItemQty] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('Other');
 
   // Save to localStorage
@@ -205,7 +207,7 @@ export function ShoppingList() {
 
       aggregatedMap.set(key, {
         name: item.name,
-        amounts: [],
+        amounts: item.quantity ? [item.quantity] : [],
         category,
         key,
         isManual: true,
@@ -347,10 +349,14 @@ export function ShoppingList() {
     );
 
     if (!alreadyExists) {
-      setManualItems(prev => [...prev, { name: trimmed, category: newItemCategory }]);
+      setManualItems(prev => [
+        ...prev,
+        { name: trimmed, category: newItemCategory, quantity: newItemQty.trim() || undefined },
+      ]);
     }
 
     setNewItemName('');
+    setNewItemQty('');
     setShowAddItem(false);
   };
 
@@ -378,6 +384,13 @@ export function ShoppingList() {
         <div className="flex gap-2 flex-wrap justify-end">
           {showAddItem ? (
             <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={newItemQty}
+                onChange={e => setNewItemQty(e.target.value)}
+                placeholder="Qty"
+                className="w-16 px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
               <input
                 type="text"
                 value={newItemName}
