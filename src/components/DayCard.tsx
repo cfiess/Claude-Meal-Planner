@@ -206,33 +206,40 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
           </div>
         ) : (
           <div className="relative" ref={dropdownRef}>
-            <input
-              type="text"
-              value={dinnerInput}
-              onChange={e => {
-                setDinnerInput(e.target.value);
-                setShowDropdown(true);
-              }}
-              onFocus={() => setShowDropdown(true)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  handleCustomMeal();
-                }
-              }}
-              placeholder="Type meal or select..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={dinnerInput}
+                onChange={e => {
+                  setDinnerInput(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleCustomMeal();
+                  }
+                }}
+                placeholder="Type or select meal..."
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
 
             {showDropdown && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                {dinnerInput.trim() && (
-                  <button
-                    onClick={handleCustomMeal}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100"
-                  >
-                    <span className="text-gray-500">Add:</span>{' '}
-                    <span className="font-medium">{dinnerInput}</span>
-                  </button>
+                {sortedRecipes.length > 0 && (
+                  <div className="px-3 py-1 text-xs text-gray-400 bg-gray-50 border-b">
+                    Your Recipes
+                  </div>
                 )}
                 {filteredRecipes.length > 0 ? (
                   filteredRecipes.map(recipe => (
@@ -247,10 +254,23 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
                       </span>
                     </button>
                   ))
+                ) : sortedRecipes.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-500">
+                    No recipes yet. Add some in Recipe Book.
+                  </div>
                 ) : (
                   <div className="px-3 py-2 text-sm text-gray-500">
-                    No recipes found. Type to add a custom meal.
+                    No matching recipes.
                   </div>
+                )}
+                {dinnerInput.trim() && (
+                  <button
+                    onClick={handleCustomMeal}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 border-t border-gray-100"
+                  >
+                    <span className="text-gray-500">Add custom:</span>{' '}
+                    <span className="font-medium text-blue-600">{dinnerInput}</span>
+                  </button>
                 )}
               </div>
             )}
