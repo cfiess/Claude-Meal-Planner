@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import Tesseract from 'tesseract.js';
 import type { Recipe, Ingredient, GroceryCategory } from '../types';
 import { useMealPlanner } from '../context/MealPlannerContext';
 import { isValidUrl } from '../utils/helpers';
@@ -38,6 +39,52 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const [parseError, setParseError] = useState('');
   const [pastedText, setPastedText] = useState('');
   const [textParseError, setTextParseError] = useState('');
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrError, setOcrError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsOcrProcessing(true);
+    setOcrProgress(0);
+    setOcrError('');
+
+    try {
+      const result = await Tesseract.recognize(file, 'eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            setOcrProgress(Math.round(m.progress * 100));
+          }
+        },
+      });
+
+      const extractedText = result.data.text;
+      if (extractedText.trim()) {
+        setPastedText(extractedText);
+        // Auto-parse the text
+        const parsed = parseRecipeFromText(extractedText);
+        if (parsed) {
+          if (parsed.name && !name) setName(parsed.name);
+          if (parsed.ingredients?.length) setIngredients(parsed.ingredients);
+          if (parsed.steps?.length) setSteps(parsed.steps);
+        }
+      } else {
+        setOcrError('Could not extract text from the image. Try a clearer photo.');
+      }
+    } catch {
+      setOcrError('Error processing image. Please try again.');
+    } finally {
+      setIsOcrProcessing(false);
+      setOcrProgress(0);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleAddIngredient = () => {
     setIngredients([
@@ -201,6 +248,52 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
               </div>
               {parseError && (
                 <p className="mt-2 text-sm text-amber-600">{parseError}</p>
+              )}
+            </div>
+          )}
+
+          {/* Photo/OCR Import - only show for new recipes */}
+          {!existingRecipe && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <label className="block text-sm font-medium text-amber-800 mb-2">
+                Scan from Photo
+              </label>
+              <p className="text-sm text-amber-700 mb-2">
+                Take a photo of a cookbook page or upload an image to extract the recipe.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoUpload}
+                className="hidden"
+                id="photo-upload"
+              />
+              <label
+                htmlFor="photo-upload"
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer ${
+                  isOcrProcessing
+                    ? 'bg-amber-400 text-amber-900 cursor-wait'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {isOcrProcessing ? `Scanning... ${ocrProgress}%` : 'Take Photo or Upload'}
+              </label>
+              {isOcrProcessing && (
+                <div className="mt-2 w-full bg-amber-200 rounded-full h-2">
+                  <div
+                    className="bg-amber-600 h-2 rounded-full transition-all"
+                    style={{ width: `${ocrProgress}%` }}
+                  />
+                </div>
+              )}
+              {ocrError && (
+                <p className="mt-2 text-sm text-red-600">{ocrError}</p>
               )}
             </div>
           )}

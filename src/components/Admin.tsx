@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMealPlanner } from '../context/MealPlannerContext';
 import { useAuth } from '../context/AuthContext';
+import { APP_VERSION } from '../version';
 
 const CATEGORIES_KEY = 'shopping-list-categories';
 const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
@@ -110,7 +111,10 @@ export function Admin() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Settings & Analytics</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Settings & Analytics</h2>
+        <span className="text-sm text-gray-400">v{APP_VERSION}</span>
+      </div>
 
       {/* Section Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">

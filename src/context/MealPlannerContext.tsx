@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
@@ -180,6 +180,10 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, getDefaultState());
   const [loading, setLoading] = React.useState(true);
 
+  // Track if we're the source of the change to avoid double-updates
+  const isLocalChange = useRef(false);
+  const lastSavedState = useRef<string>('');
+
   // Sync with Firestore when household changes
   useEffect(() => {
     if (!household) {
@@ -190,8 +194,23 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     const docRef = doc(db, 'households', household.id, 'data', 'mealPlanner');
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      // Skip if this is our own change
+      if (isLocalChange.current) {
+        isLocalChange.current = false;
+        return;
+      }
+
       if (docSnap.exists()) {
         const data = docSnap.data() as MealPlannerState;
+        const dataString = JSON.stringify(data);
+
+        // Skip if data hasn't actually changed
+        if (dataString === lastSavedState.current) {
+          setLoading(false);
+          return;
+        }
+
+        lastSavedState.current = dataString;
         const currentMonday = getMonday(new Date()).toISOString().split('T')[0];
 
         // Check if we need a new week
@@ -204,14 +223,18 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
           };
           dispatch({ type: 'LOAD_STATE', state: newState });
           // Save the updated state back to Firestore
+          isLocalChange.current = true;
           setDoc(docRef, newState);
+          lastSavedState.current = JSON.stringify(newState);
         } else {
           dispatch({ type: 'LOAD_STATE', state: data });
         }
       } else {
         // Initialize with default state
         const defaultState = getDefaultState();
+        isLocalChange.current = true;
         setDoc(docRef, defaultState);
+        lastSavedState.current = JSON.stringify(defaultState);
         dispatch({ type: 'LOAD_STATE', state: defaultState });
       }
       setLoading(false);
@@ -223,15 +246,18 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [household]);
 
-  // Save to Firestore whenever state changes (but not on initial load)
+  // Save to Firestore
   const saveToFirestore = async (newState: MealPlannerState) => {
     if (!household) return;
 
     const docRef = doc(db, 'households', household.id, 'data', 'mealPlanner');
     try {
+      isLocalChange.current = true;
+      lastSavedState.current = JSON.stringify(newState);
       await setDoc(docRef, newState);
     } catch (error) {
       console.error('Error saving to Firestore:', error);
+      isLocalChange.current = false;
     }
   };
 
@@ -331,6 +357,3 @@ export function useMealPlanner() {
   }
   return context;
 }
-
-// Need to import React for useState
-import React from 'react';
