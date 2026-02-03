@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMealPlanner } from '../context/MealPlannerContext';
+import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES_KEY = 'shopping-list-categories';
 const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
@@ -20,12 +21,14 @@ const INITIAL_CATEGORIES = [
 
 export function Admin() {
   const { state, addTag, removeTag, updateTag } = useMealPlanner();
+  const { household } = useAuth();
 
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editingTagName, setEditingTagName] = useState('');
   const [newTagName, setNewTagName] = useState('');
   const [showAddTag, setShowAddTag] = useState(false);
-  const [activeSection, setActiveSection] = useState<'tags' | 'categories' | 'history' | 'analytics' | 'data'>('analytics');
+  const [activeSection, setActiveSection] = useState<'tags' | 'categories' | 'history' | 'analytics' | 'data' | 'household'>('analytics');
+  const [copied, setCopied] = useState(false);
 
   // Shopping history (cumulative counts)
   const [shoppingHistory, setShoppingHistory] = useState<Record<string, number>>(() => {
@@ -160,6 +163,16 @@ export function Admin() {
           }`}
         >
           Data Management
+        </button>
+        <button
+          onClick={() => setActiveSection('household')}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            activeSection === 'household'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          Household
         </button>
       </div>
 
@@ -404,6 +417,46 @@ export function Admin() {
             >
               Delete All Data
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Household Section */}
+      {activeSection === 'household' && household && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Household Info</h3>
+            <p className="text-gray-600 mb-4">
+              <strong>Name:</strong> {household.name}
+            </p>
+            <p className="text-gray-600 mb-4">
+              <strong>Members:</strong> {household.members.length} {household.members.length === 1 ? 'person' : 'people'}
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Invite Someone</h3>
+            <p className="text-gray-600 mb-4">
+              Share this code with your partner so they can join your household:
+            </p>
+            <div className="flex gap-2 items-center">
+              <code className="bg-gray-100 px-4 py-2 rounded-md text-sm font-mono flex-1 break-all">
+                {household.id}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(household.id);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm whitespace-nowrap"
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              They'll need to sign in and paste this code to join.
+            </p>
           </div>
         </div>
       )}
