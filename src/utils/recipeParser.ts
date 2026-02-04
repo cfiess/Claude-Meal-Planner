@@ -200,6 +200,51 @@ export async function parseRecipeFromUrl(url: string): Promise<ParsedRecipe | nu
   }
 }
 
+// Check if a line is likely an ingredient section header
+function isIngredientHeader(line: string): boolean {
+  const lower = line.toLowerCase().trim();
+  // Match variations: "Ingredients", "Ingredients:", "INGREDIENTS", "For the ingredients", etc.
+  return /^(for\s+)?(the\s+)?ingredients?:?$/i.test(lower) ||
+    lower === 'you will need:' ||
+    lower === 'you\'ll need:' ||
+    lower === 'what you need:' ||
+    lower === 'what you\'ll need:';
+}
+
+// Check if a line is likely an instructions section header
+function isInstructionsHeader(line: string): boolean {
+  const lower = line.toLowerCase().trim();
+  // Match variations: "Instructions", "Directions", "Method", "Steps", "How to Make", "Preparation", etc.
+  return /^(for\s+)?(the\s+)?(instructions?|directions?|method|steps?|preparation|how to( make)?|procedure):?$/i.test(lower) ||
+    lower === 'to make:' ||
+    lower === 'to prepare:' ||
+    lower === 'what to do:' ||
+    /^step\s*\d+/i.test(lower);
+}
+
+// Check if a line looks like an ingredient (starts with quantity)
+function looksLikeIngredient(line: string): boolean {
+  // Starts with number, fraction, or measurement word
+  return /^[\d½¼¾⅓⅔⅛]/.test(line) ||
+    /^(one|two|three|four|five|six|seven|eight|nine|ten|a|an)\s/i.test(line) ||
+    // Short line with common ingredient patterns
+    (line.length < 60 && /\b(cup|tbsp|tsp|oz|lb|pound|teaspoon|tablespoon|ounce|clove|can|pinch|dash)\b/i.test(line));
+}
+
+// Check if a line looks like an instruction step
+function looksLikeInstruction(line: string): boolean {
+  // Starts with a cooking verb
+  const cookingVerbs = /^(preheat|mix|add|stir|cook|bake|heat|combine|pour|place|set|let|bring|cut|chop|slice|whisk|beat|fold|knead|roll|spread|layer|arrange|season|sprinkle|drizzle|toss|marinate|simmer|boil|fry|sauté|saute|roast|grill|broil|steam|drain|rinse|melt|blend|puree|mash|shred|dice|mince|cover|remove|transfer|serve|garnish|refrigerate|freeze|thaw|warm|cool|rest|meanwhile|first|then|next|finally|carefully|gently|slowly|quickly|immediately|gradually|continue|repeat|flip|turn|reduce|increase|lower|raise|adjust|taste|check)\b/i;
+
+  // Longer lines are more likely to be instructions
+  const isLongLine = line.length > 60;
+
+  // Contains instruction-like patterns
+  const hasInstructionPattern = /\b(minutes?|hours?|until|degrees?|°|oven|pan|pot|bowl|skillet|baking|medium|high|low heat)\b/i.test(line);
+
+  return cookingVerbs.test(line) || (isLongLine && hasInstructionPattern);
+}
+
 export function parseRecipeFromText(text: string): ParsedRecipe | null {
   if (!text.trim()) return null;
 
@@ -213,19 +258,13 @@ export function parseRecipeFromText(text: string): ParsedRecipe | null {
   let currentSection: 'unknown' | 'ingredients' | 'instructions' = 'unknown';
 
   for (const line of lines) {
-    const lowerLine = line.toLowerCase();
 
     // Detect section headers
-    if (lowerLine.includes('ingredient')) {
+    if (isIngredientHeader(line)) {
       currentSection = 'ingredients';
       continue;
     }
-    if (
-      lowerLine.includes('instruction') ||
-      lowerLine.includes('direction') ||
-      lowerLine.includes('method') ||
-      lowerLine.includes('steps')
-    ) {
+    if (isInstructionsHeader(line)) {
       currentSection = 'instructions';
       continue;
     }
@@ -233,8 +272,9 @@ export function parseRecipeFromText(text: string): ParsedRecipe | null {
     // If first non-header line and no name yet, treat as recipe name
     if (!parsed.name && currentSection === 'unknown') {
       // Skip lines that look like ingredients or steps
-      const looksLikeIngredient = /^\d|^[-•*]/.test(line);
-      if (!looksLikeIngredient && line.length < 100) {
+      const isIngredient = looksLikeIngredient(line);
+      const isInstruction = looksLikeInstruction(line);
+      if (!isIngredient && !isInstruction && line.length < 100 && !line.startsWith('-') && !line.startsWith('•')) {
         parsed.name = line;
         continue;
       }
@@ -248,32 +288,42 @@ export function parseRecipeFromText(text: string): ParsedRecipe | null {
 
     if (!cleanedLine) continue;
 
-    // Try to intelligently categorize if section is unknown
-    if (currentSection === 'unknown') {
-      // Lines starting with numbers/fractions followed by units are likely ingredients
-      const looksLikeIngredient = /^[\d½¼¾⅓⅔⅛]/.test(cleanedLine) ||
-        /^(one|two|three|four|five|six|a|an)\s/i.test(cleanedLine);
-      // Longer lines with verbs are likely instructions
-      const looksLikeStep = cleanedLine.length > 50 ||
-        /^(preheat|mix|add|stir|cook|bake|heat|combine|pour|place|set|let|bring|cut|chop|slice)/i.test(cleanedLine);
-
-      if (looksLikeIngredient && !looksLikeStep) {
-        ingredientLines.push(cleanedLine);
-      } else if (looksLikeStep) {
-        stepLines.push(cleanedLine);
-      } else if (ingredientLines.length > 0 && stepLines.length === 0) {
-        // If we've started collecting ingredients, keep adding until we hit steps
-        ingredientLines.push(cleanedLine);
-      } else if (stepLines.length > 0) {
-        stepLines.push(cleanedLine);
-      }
-    } else if (currentSection === 'ingredients') {
+    // Add to appropriate section
+    if (currentSection === 'ingredients') {
       ingredientLines.push(cleanedLine);
     } else if (currentSection === 'instructions') {
       stepLines.push(cleanedLine);
+    } else {
+      // Unknown section - use heuristics
+      const isIngredient = looksLikeIngredient(cleanedLine);
+      const isInstruction = looksLikeInstruction(cleanedLine);
+
+      if (isIngredient && !isInstruction) {
+        ingredientLines.push(cleanedLine);
+      } else if (isInstruction && !isIngredient) {
+        // Once we start seeing instructions, switch to instruction mode
+        currentSection = 'instructions';
+        stepLines.push(cleanedLine);
+      } else if (ingredientLines.length > 0 && stepLines.length === 0) {
+        // If we've been collecting ingredients and this doesn't look like an instruction,
+        // assume it's still an ingredient
+        ingredientLines.push(cleanedLine);
+      } else if (stepLines.length > 0) {
+        // If we've started collecting steps, keep adding
+        stepLines.push(cleanedLine);
+      } else {
+        // Default: if line is short, treat as ingredient; if long, treat as instruction
+        if (cleanedLine.length < 50) {
+          ingredientLines.push(cleanedLine);
+        } else {
+          stepLines.push(cleanedLine);
+        }
+      }
     }
   }
 
+  // If no explicit sections were found but we have both ingredients and steps,
+  // the heuristics probably worked
   if (ingredientLines.length > 0) {
     parsed.ingredients = ingredientLines.map(line => parseIngredientString(line));
   }

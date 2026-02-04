@@ -1,6 +1,5 @@
-import { useState, useRef } from 'react';
-import Tesseract from 'tesseract.js';
-import type { Recipe, Ingredient, GroceryCategory } from '../types';
+import { useState } from 'react';
+import type { Recipe, Ingredient } from '../types';
 import { useMealPlanner } from '../context/MealPlannerContext';
 import { isValidUrl } from '../utils/helpers';
 import { parseRecipeFromUrl, parseRecipeFromText } from '../utils/recipeParser';
@@ -9,18 +8,6 @@ interface RecipeFormProps {
   existingRecipe?: Recipe;
   onClose: () => void;
 }
-
-const GROCERY_CATEGORIES: GroceryCategory[] = [
-  'produce',
-  'meat',
-  'dairy',
-  'bakery',
-  'frozen',
-  'pantry',
-  'beverages',
-  'condiments',
-  'other',
-];
 
 export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const { addRecipe, updateRecipe, state, addTag } = useMealPlanner();
@@ -39,87 +26,6 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const [parseError, setParseError] = useState('');
   const [pastedText, setPastedText] = useState('');
   const [textParseError, setTextParseError] = useState('');
-  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrError, setOcrError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsOcrProcessing(true);
-    setOcrProgress(0);
-    setOcrError('');
-
-    try {
-      const result = await Tesseract.recognize(file, 'eng', {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-        },
-      });
-
-      const extractedText = result.data.text;
-      if (extractedText.trim()) {
-        setPastedText(extractedText);
-        // Auto-parse the text
-        const parsed = parseRecipeFromText(extractedText);
-        if (parsed) {
-          if (parsed.name && !name) setName(parsed.name);
-          if (parsed.ingredients?.length) setIngredients(parsed.ingredients);
-          if (parsed.steps?.length) setSteps(parsed.steps);
-        }
-      } else {
-        setOcrError('Could not extract text from the image. Try a clearer photo.');
-      }
-    } catch {
-      setOcrError('Error processing image. Please try again.');
-    } finally {
-      setIsOcrProcessing(false);
-      setOcrProgress(0);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleAddIngredient = () => {
-    setIngredients([
-      ...ingredients,
-      { name: '', amount: '', unit: '', category: 'other' },
-    ]);
-  };
-
-  const handleUpdateIngredient = (
-    index: number,
-    field: keyof Ingredient,
-    value: string
-  ) => {
-    const updated = [...ingredients];
-    updated[index] = { ...updated[index], [field]: value };
-    setIngredients(updated);
-  };
-
-  const handleRemoveIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
-  };
-
-  const handleAddStep = () => {
-    setSteps([...steps, '']);
-  };
-
-  const handleUpdateStep = (index: number, value: string) => {
-    const updated = [...steps];
-    updated[index] = value;
-    setSteps(updated);
-  };
-
-  const handleRemoveStep = (index: number) => {
-    setSteps(steps.filter((_, i) => i !== index));
-  };
 
   const handleToggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -153,7 +59,7 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
       setPastedText(''); // Clear after successful parse
     } else {
       setTextParseError(
-        'Could not parse recipe from text. Try adding ingredients and steps manually below.'
+        'Could not parse recipe from text. Please make sure you enter a recipe name.'
       );
     }
   };
@@ -175,12 +81,12 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
         if (parsed.steps?.length) setSteps(parsed.steps);
       } else {
         setParseError(
-          'Could not parse recipe from this URL. You can add the recipe details manually.'
+          'Could not parse recipe from this URL. You can enter the recipe name manually.'
         );
       }
     } catch {
       setParseError(
-        'Could not parse recipe from this URL. You can add the recipe details manually.'
+        'Could not parse recipe from this URL. You can enter the recipe name manually.'
       );
     } finally {
       setIsParsing(false);
@@ -248,52 +154,6 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
               </div>
               {parseError && (
                 <p className="mt-2 text-sm text-amber-600">{parseError}</p>
-              )}
-            </div>
-          )}
-
-          {/* Photo/OCR Import - only show for new recipes */}
-          {!existingRecipe && (
-            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <label className="block text-sm font-medium text-amber-800 mb-2">
-                Scan from Photo
-              </label>
-              <p className="text-sm text-amber-700 mb-2">
-                Take a photo of a cookbook page or upload an image to extract the recipe.
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoUpload}
-                className="hidden"
-                id="photo-upload"
-              />
-              <label
-                htmlFor="photo-upload"
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer ${
-                  isOcrProcessing
-                    ? 'bg-amber-400 text-amber-900 cursor-wait'
-                    : 'bg-amber-600 text-white hover:bg-amber-700'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {isOcrProcessing ? `Scanning... ${ocrProgress}%` : 'Take Photo or Upload'}
-              </label>
-              {isOcrProcessing && (
-                <div className="mt-2 w-full bg-amber-200 rounded-full h-2">
-                  <div
-                    className="bg-amber-600 h-2 rounded-full transition-all"
-                    style={{ width: `${ocrProgress}%` }}
-                  />
-                </div>
-              )}
-              {ocrError && (
-                <p className="mt-2 text-sm text-red-600">{ocrError}</p>
               )}
             </div>
           )}
@@ -426,107 +286,47 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
             </div>
           </div>
 
-          {/* Ingredients */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ingredients (optional)
-            </label>
-            {ingredients.map((ingredient, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={ingredient.amount}
-                  onChange={e =>
-                    handleUpdateIngredient(index, 'amount', e.target.value)
-                  }
-                  className="w-20 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                  placeholder="Amt"
-                />
-                <input
-                  type="text"
-                  value={ingredient.unit}
-                  onChange={e =>
-                    handleUpdateIngredient(index, 'unit', e.target.value)
-                  }
-                  className="w-20 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                  placeholder="Unit"
-                />
-                <input
-                  type="text"
-                  value={ingredient.name}
-                  onChange={e =>
-                    handleUpdateIngredient(index, 'name', e.target.value)
-                  }
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                  placeholder="Ingredient name"
-                />
-                <select
-                  value={ingredient.category}
-                  onChange={e =>
-                    handleUpdateIngredient(
-                      index,
-                      'category',
-                      e.target.value as GroceryCategory
-                    )
-                  }
-                  className="w-28 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                >
-                  {GROCERY_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
+          {/* Parsed Ingredients Summary (read-only display) */}
+          {ingredients.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Parsed Ingredients ({ingredients.length})
+              </label>
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {ingredients.slice(0, 10).map((ing, idx) => (
+                    <li key={idx}>
+                      {ing.amount} {ing.unit} {ing.name}
+                    </li>
                   ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveIngredient(index)}
-                  className="px-2 py-1 text-red-600 hover:text-red-800"
-                >
-                  X
-                </button>
+                  {ingredients.length > 10 && (
+                    <li className="text-gray-400">...and {ingredients.length - 10} more</li>
+                  )}
+                </ul>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={handleAddIngredient}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              + Add Ingredient
-            </button>
-          </div>
+            </div>
+          )}
 
-          {/* Steps */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Steps (optional)
-            </label>
-            {steps.map((step, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <span className="text-gray-500 py-1">{index + 1}.</span>
-                <textarea
-                  value={step}
-                  onChange={e => handleUpdateStep(index, e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm resize-none"
-                  rows={2}
-                  placeholder="Describe this step..."
-                />
-                <button
-                  type="button"
-                  onClick={() => handleRemoveStep(index)}
-                  className="px-2 py-1 text-red-600 hover:text-red-800"
-                >
-                  X
-                </button>
+          {/* Parsed Steps Summary (read-only display) */}
+          {steps.length > 0 && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Parsed Steps ({steps.length})
+              </label>
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                  {steps.slice(0, 5).map((step, idx) => (
+                    <li key={idx} className="truncate">
+                      {step.length > 80 ? step.substring(0, 80) + '...' : step}
+                    </li>
+                  ))}
+                  {steps.length > 5 && (
+                    <li className="text-gray-400 list-none">...and {steps.length - 5} more steps</li>
+                  )}
+                </ol>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={handleAddStep}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              + Add Step
-            </button>
-          </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3">

@@ -8,11 +8,11 @@ interface DayCardProps {
   label: string;
   date: string;
   plan: DayPlan;
+  week: 'current' | 'next';
 }
 
-export function DayCard({ day, label, date, plan }: DayCardProps) {
-  const { state, setDayDinner, setDayLunch, getRecipeById, incrementTimesCooked } =
-    useMealPlanner();
+export function DayCard({ day, label, date, plan, week }: DayCardProps) {
+  const { state, setDayDinner, setDayLunch, getRecipeById } = useMealPlanner();
 
   const [dinnerInput, setDinnerInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -61,8 +61,7 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
       customMealName: undefined,
       customLink: undefined,
       notes: plan.dinner.notes,
-    });
-    incrementTimesCooked(recipe.id);
+    }, week);
     setDinnerInput('');
     setShowDropdown(false);
   };
@@ -77,21 +76,21 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
         customMealName: plan.dinner.customMealName || 'Linked Recipe',
         customLink: dinnerInput,
         notes: plan.dinner.notes,
-      });
+      }, week);
     } else {
       setDayDinner(day, {
         recipeId: undefined,
         customMealName: dinnerInput,
         customLink: plan.dinner.customLink,
         notes: plan.dinner.notes,
-      });
+      }, week);
     }
     setDinnerInput('');
     setShowDropdown(false);
   };
 
   const handleClearDinner = () => {
-    setDayDinner(day, {});
+    setDayDinner(day, {}, week);
     setNotesInput('');
   };
 
@@ -100,7 +99,7 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
       setDayDinner(day, {
         ...plan.dinner,
         notes: notesInput || undefined,
-      });
+      }, week);
     }
   };
 
@@ -110,7 +109,7 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
       setDayDinner(day, {
         ...plan.dinner,
         customLink: link,
-      });
+      }, week);
     }
   };
 
@@ -286,7 +285,7 @@ export function DayCard({ day, label, date, plan }: DayCardProps) {
         <input
           type="text"
           value={plan.lunch}
-          onChange={e => setDayLunch(day, e.target.value)}
+          onChange={e => setDayLunch(day, e.target.value, week)}
           placeholder="Leftovers, sandwiches..."
           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />

@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import type { Recipe, WeekPlan, DayOfWeek, DayMeal, MealPlannerState } from '../types';
-import { getMonday, generateId } from '../utils/helpers';
+import { getMonday, getNextMonday, generateId } from '../utils/helpers';
 
 const DEFAULT_TAGS = [
   'quick',
@@ -35,24 +35,48 @@ function createEmptyWeek(weekStartDate: string): WeekPlan {
 
 function getDefaultState(): MealPlannerState {
   const currentMonday = getMonday(new Date()).toISOString().split('T')[0];
+  const nextMonday = getNextMonday(new Date()).toISOString().split('T')[0];
   return {
     recipes: [],
     currentWeek: createEmptyWeek(currentMonday),
+    nextWeek: createEmptyWeek(nextMonday),
     weekHistory: [],
     availableTags: DEFAULT_TAGS,
   };
+}
+
+// Count recipes used in a week and increment their timesCooked
+function incrementRecipeCounts(recipes: Recipe[], week: WeekPlan): Recipe[] {
+  const recipeCountMap = new Map<string, number>();
+
+  // Count how many times each recipe is used in the week
+  Object.values(week.days).forEach(day => {
+    if (day.dinner.recipeId) {
+      const count = recipeCountMap.get(day.dinner.recipeId) || 0;
+      recipeCountMap.set(day.dinner.recipeId, count + 1);
+    }
+  });
+
+  // Increment timesCooked for each recipe
+  return recipes.map(r => {
+    const count = recipeCountMap.get(r.id);
+    if (count) {
+      return { ...r, timesCooked: r.timesCooked + count };
+    }
+    return r;
+  });
 }
 
 type Action =
   | { type: 'ADD_RECIPE'; recipe: Recipe }
   | { type: 'UPDATE_RECIPE'; recipe: Recipe }
   | { type: 'DELETE_RECIPE'; recipeId: string }
-  | { type: 'SET_DAY_DINNER'; day: DayOfWeek; dinner: DayMeal }
-  | { type: 'SET_DAY_LUNCH'; day: DayOfWeek; lunch: string }
+  | { type: 'SET_DAY_DINNER'; day: DayOfWeek; dinner: DayMeal; week: 'current' | 'next' }
+  | { type: 'SET_DAY_LUNCH'; day: DayOfWeek; lunch: string; week: 'current' | 'next' }
   | { type: 'ADD_TAG'; tag: string }
   | { type: 'REMOVE_TAG'; tag: string }
   | { type: 'UPDATE_TAG'; oldTag: string; newTag: string }
-  | { type: 'INCREMENT_TIMES_COOKED'; recipeId: string }
+  | { type: 'RESET_TIMES_COOKED' }
   | { type: 'LOAD_STATE'; state: MealPlannerState };
 
 function reducer(state: MealPlannerState, action: Action): MealPlannerState {
@@ -78,34 +102,66 @@ function reducer(state: MealPlannerState, action: Action): MealPlannerState {
       };
 
     case 'SET_DAY_DINNER':
-      return {
-        ...state,
-        currentWeek: {
-          ...state.currentWeek,
-          days: {
-            ...state.currentWeek.days,
-            [action.day]: {
-              ...state.currentWeek.days[action.day],
-              dinner: action.dinner,
+      if (action.week === 'current') {
+        return {
+          ...state,
+          currentWeek: {
+            ...state.currentWeek,
+            days: {
+              ...state.currentWeek.days,
+              [action.day]: {
+                ...state.currentWeek.days[action.day],
+                dinner: action.dinner,
+              },
             },
           },
-        },
-      };
+        };
+      } else {
+        return {
+          ...state,
+          nextWeek: {
+            ...state.nextWeek,
+            days: {
+              ...state.nextWeek.days,
+              [action.day]: {
+                ...state.nextWeek.days[action.day],
+                dinner: action.dinner,
+              },
+            },
+          },
+        };
+      }
 
     case 'SET_DAY_LUNCH':
-      return {
-        ...state,
-        currentWeek: {
-          ...state.currentWeek,
-          days: {
-            ...state.currentWeek.days,
-            [action.day]: {
-              ...state.currentWeek.days[action.day],
-              lunch: action.lunch,
+      if (action.week === 'current') {
+        return {
+          ...state,
+          currentWeek: {
+            ...state.currentWeek,
+            days: {
+              ...state.currentWeek.days,
+              [action.day]: {
+                ...state.currentWeek.days[action.day],
+                lunch: action.lunch,
+              },
             },
           },
-        },
-      };
+        };
+      } else {
+        return {
+          ...state,
+          nextWeek: {
+            ...state.nextWeek,
+            days: {
+              ...state.nextWeek.days,
+              [action.day]: {
+                ...state.nextWeek.days[action.day],
+                lunch: action.lunch,
+              },
+            },
+          },
+        };
+      }
 
     case 'ADD_TAG':
       if (state.availableTags.includes(action.tag)) {
@@ -120,7 +176,6 @@ function reducer(state: MealPlannerState, action: Action): MealPlannerState {
       return {
         ...state,
         availableTags: state.availableTags.filter(t => t !== action.tag),
-        // Also remove from all recipes
         recipes: state.recipes.map(r => ({
           ...r,
           tags: r.tags.filter(t => t !== action.tag),
@@ -133,21 +188,16 @@ function reducer(state: MealPlannerState, action: Action): MealPlannerState {
         availableTags: state.availableTags.map(t =>
           t === action.oldTag ? action.newTag : t
         ),
-        // Also update in all recipes
         recipes: state.recipes.map(r => ({
           ...r,
           tags: r.tags.map(t => (t === action.oldTag ? action.newTag : t)),
         })),
       };
 
-    case 'INCREMENT_TIMES_COOKED':
+    case 'RESET_TIMES_COOKED':
       return {
         ...state,
-        recipes: state.recipes.map(r =>
-          r.id === action.recipeId
-            ? { ...r, timesCooked: r.timesCooked + 1 }
-            : r
-        ),
+        recipes: state.recipes.map(r => ({ ...r, timesCooked: 0 })),
       };
 
     case 'LOAD_STATE':
@@ -164,12 +214,12 @@ interface MealPlannerContextValue {
   addRecipe: (recipe: Omit<Recipe, 'id' | 'timesCooked' | 'createdAt' | 'updatedAt'>) => void;
   updateRecipe: (recipe: Recipe) => void;
   deleteRecipe: (recipeId: string) => void;
-  setDayDinner: (day: DayOfWeek, dinner: DayMeal) => void;
-  setDayLunch: (day: DayOfWeek, lunch: string) => void;
+  setDayDinner: (day: DayOfWeek, dinner: DayMeal, week?: 'current' | 'next') => void;
+  setDayLunch: (day: DayOfWeek, lunch: string, week?: 'current' | 'next') => void;
   addTag: (tag: string) => void;
   removeTag: (tag: string) => void;
   updateTag: (oldTag: string, newTag: string) => void;
-  incrementTimesCooked: (recipeId: string) => void;
+  resetTimesCooked: () => void;
   getRecipeById: (id: string) => Recipe | undefined;
 }
 
@@ -180,11 +230,9 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, getDefaultState());
   const [loading, setLoading] = React.useState(true);
 
-  // Track if we're the source of the change to avoid double-updates
   const isLocalChange = useRef(false);
   const lastSavedState = useRef<string>('');
 
-  // Sync with Firestore when household changes
   useEffect(() => {
     if (!household) {
       setLoading(false);
@@ -194,7 +242,6 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     const docRef = doc(db, 'households', household.id, 'data', 'mealPlanner');
 
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      // Skip if this is our own change
       if (isLocalChange.current) {
         isLocalChange.current = false;
         return;
@@ -204,7 +251,6 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
         const data = docSnap.data() as MealPlannerState;
         const dataString = JSON.stringify(data);
 
-        // Skip if data hasn't actually changed
         if (dataString === lastSavedState.current) {
           setLoading(false);
           return;
@@ -212,25 +258,43 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
 
         lastSavedState.current = dataString;
         const currentMonday = getMonday(new Date()).toISOString().split('T')[0];
+        const nextMonday = getNextMonday(new Date()).toISOString().split('T')[0];
 
-        // Check if we need a new week
+        // Check if we need to transition weeks
         if (data.currentWeek.weekStartDate !== currentMonday) {
-          // Archive current week and start fresh
-          const newState = {
+          // Increment times cooked for recipes in the archived week
+          const updatedRecipes = incrementRecipeCounts(data.recipes, data.currentWeek);
+
+          // Archive current week, move next week to current, create new next week
+          const newState: MealPlannerState = {
             ...data,
+            recipes: updatedRecipes,
             weekHistory: [data.currentWeek, ...data.weekHistory],
-            currentWeek: createEmptyWeek(currentMonday),
+            currentWeek: data.nextWeek?.weekStartDate === currentMonday
+              ? data.nextWeek
+              : createEmptyWeek(currentMonday),
+            nextWeek: createEmptyWeek(nextMonday),
           };
           dispatch({ type: 'LOAD_STATE', state: newState });
-          // Save the updated state back to Firestore
           isLocalChange.current = true;
           setDoc(docRef, newState);
           lastSavedState.current = JSON.stringify(newState);
         } else {
-          dispatch({ type: 'LOAD_STATE', state: data });
+          // Ensure nextWeek exists and has correct date
+          if (!data.nextWeek || data.nextWeek.weekStartDate !== nextMonday) {
+            const newState = {
+              ...data,
+              nextWeek: createEmptyWeek(nextMonday),
+            };
+            dispatch({ type: 'LOAD_STATE', state: newState });
+            isLocalChange.current = true;
+            setDoc(docRef, newState);
+            lastSavedState.current = JSON.stringify(newState);
+          } else {
+            dispatch({ type: 'LOAD_STATE', state: data });
+          }
         }
       } else {
-        // Initialize with default state
         const defaultState = getDefaultState();
         isLocalChange.current = true;
         setDoc(docRef, defaultState);
@@ -246,7 +310,6 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [household]);
 
-  // Save to Firestore
   const saveToFirestore = async (newState: MealPlannerState) => {
     if (!household) return;
 
@@ -288,15 +351,15 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     saveToFirestore(newState);
   };
 
-  const setDayDinner = (day: DayOfWeek, dinner: DayMeal) => {
-    const newState = reducer(state, { type: 'SET_DAY_DINNER', day, dinner });
-    dispatch({ type: 'SET_DAY_DINNER', day, dinner });
+  const setDayDinner = (day: DayOfWeek, dinner: DayMeal, week: 'current' | 'next' = 'current') => {
+    const newState = reducer(state, { type: 'SET_DAY_DINNER', day, dinner, week });
+    dispatch({ type: 'SET_DAY_DINNER', day, dinner, week });
     saveToFirestore(newState);
   };
 
-  const setDayLunch = (day: DayOfWeek, lunch: string) => {
-    const newState = reducer(state, { type: 'SET_DAY_LUNCH', day, lunch });
-    dispatch({ type: 'SET_DAY_LUNCH', day, lunch });
+  const setDayLunch = (day: DayOfWeek, lunch: string, week: 'current' | 'next' = 'current') => {
+    const newState = reducer(state, { type: 'SET_DAY_LUNCH', day, lunch, week });
+    dispatch({ type: 'SET_DAY_LUNCH', day, lunch, week });
     saveToFirestore(newState);
   };
 
@@ -318,9 +381,9 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     saveToFirestore(newState);
   };
 
-  const incrementTimesCooked = (recipeId: string) => {
-    const newState = reducer(state, { type: 'INCREMENT_TIMES_COOKED', recipeId });
-    dispatch({ type: 'INCREMENT_TIMES_COOKED', recipeId });
+  const resetTimesCooked = () => {
+    const newState = reducer(state, { type: 'RESET_TIMES_COOKED' });
+    dispatch({ type: 'RESET_TIMES_COOKED' });
     saveToFirestore(newState);
   };
 
@@ -341,7 +404,7 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
         addTag,
         removeTag,
         updateTag,
-        incrementTimesCooked,
+        resetTimesCooked,
         getRecipeById,
       }}
     >

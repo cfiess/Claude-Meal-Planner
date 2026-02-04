@@ -9,6 +9,12 @@ export function getMonday(date: Date): Date {
   return new Date(d.setDate(diff));
 }
 
+export function getNextMonday(date: Date): Date {
+  const monday = getMonday(date);
+  monday.setDate(monday.getDate() + 7);
+  return monday;
+}
+
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {

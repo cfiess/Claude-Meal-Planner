@@ -57,6 +57,7 @@ export interface ShoppingListItem {
 export interface MealPlannerState {
   recipes: Recipe[];
   currentWeek: WeekPlan;
+  nextWeek: WeekPlan;
   weekHistory: WeekPlan[];
   availableTags: string[];
 }

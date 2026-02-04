@@ -4,10 +4,175 @@ import type { Ingredient } from '../types';
 
 interface AggregatedItem {
   name: string;
-  amounts: string[];
+  displayAmount: string;
   category: string;
   key: string;
   isManual?: boolean;
+}
+
+// Unit normalization maps
+const UNIT_ALIASES: Record<string, string> = {
+  lb: 'lb',
+  lbs: 'lb',
+  pound: 'lb',
+  pounds: 'lb',
+  oz: 'oz',
+  ounce: 'oz',
+  ounces: 'oz',
+  cup: 'cup',
+  cups: 'cup',
+  c: 'cup',
+  tbsp: 'tbsp',
+  tablespoon: 'tbsp',
+  tablespoons: 'tbsp',
+  tbs: 'tbsp',
+  tsp: 'tsp',
+  teaspoon: 'tsp',
+  teaspoons: 'tsp',
+  g: 'g',
+  gram: 'g',
+  grams: 'g',
+  kg: 'kg',
+  kilogram: 'kg',
+  kilograms: 'kg',
+  ml: 'ml',
+  milliliter: 'ml',
+  milliliters: 'ml',
+  l: 'L',
+  liter: 'L',
+  liters: 'L',
+  can: 'can',
+  cans: 'can',
+  clove: 'clove',
+  cloves: 'clove',
+  slice: 'slice',
+  slices: 'slice',
+  piece: 'piece',
+  pieces: 'piece',
+  bunch: 'bunch',
+  bunches: 'bunch',
+  head: 'head',
+  heads: 'head',
+  pkg: 'pkg',
+  package: 'pkg',
+  packages: 'pkg',
+  bag: 'bag',
+  bags: 'bag',
+};
+
+// Parse fraction strings like "1/2", "1 1/2", "2"
+function parseFraction(str: string): number | null {
+  str = str.trim();
+
+  // Handle mixed fractions like "1 1/2"
+  const mixedMatch = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixedMatch) {
+    const whole = parseInt(mixedMatch[1], 10);
+    const num = parseInt(mixedMatch[2], 10);
+    const denom = parseInt(mixedMatch[3], 10);
+    if (denom === 0) return null;
+    return whole + num / denom;
+  }
+
+  // Handle simple fractions like "1/2"
+  const fractionMatch = str.match(/^(\d+)\/(\d+)$/);
+  if (fractionMatch) {
+    const num = parseInt(fractionMatch[1], 10);
+    const denom = parseInt(fractionMatch[2], 10);
+    if (denom === 0) return null;
+    return num / denom;
+  }
+
+  // Handle decimals and whole numbers
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
+}
+
+// Parse an amount string like "2 cups" into { value: 2, unit: "cup" }
+function parseAmount(amountStr: string): { value: number; unit: string } | null {
+  if (!amountStr?.trim()) return null;
+
+  const str = amountStr.trim().toLowerCase();
+
+  // Match patterns like "2", "1/2", "1 1/2", "2 cups", "1/2 cup"
+  const match = str.match(/^([\d\s\/\.]+)\s*(.*)$/);
+  if (!match) return null;
+
+  const valueStr = match[1].trim();
+  const unitStr = match[2].trim();
+
+  const value = parseFraction(valueStr);
+  if (value === null) return null;
+
+  // Normalize the unit
+  const normalizedUnit = UNIT_ALIASES[unitStr] || unitStr || '';
+
+  return { value, unit: normalizedUnit };
+}
+
+// Format a number nicely (avoid ugly decimals)
+function formatNumber(num: number): string {
+  // Common fractions
+  const fractions: [number, string][] = [
+    [0.25, '1/4'],
+    [0.333, '1/3'],
+    [0.5, '1/2'],
+    [0.666, '2/3'],
+    [0.75, '3/4'],
+  ];
+
+  const whole = Math.floor(num);
+  const decimal = num - whole;
+
+  // Check if decimal part matches a common fraction
+  for (const [val, str] of fractions) {
+    if (Math.abs(decimal - val) < 0.05) {
+      return whole > 0 ? `${whole} ${str}` : str;
+    }
+  }
+
+  // Round to 2 decimal places if needed
+  if (Math.abs(num - Math.round(num)) < 0.01) {
+    return Math.round(num).toString();
+  }
+
+  return num.toFixed(2).replace(/\.?0+$/, '');
+}
+
+// Aggregate multiple amounts into a single display string
+function aggregateAmounts(amounts: string[]): string {
+  if (amounts.length === 0) return '';
+  if (amounts.length === 1) return amounts[0];
+
+  // Group by unit
+  const byUnit: Record<string, number> = {};
+  const unparseable: string[] = [];
+
+  for (const amt of amounts) {
+    const parsed = parseAmount(amt);
+    if (parsed) {
+      byUnit[parsed.unit] = (byUnit[parsed.unit] || 0) + parsed.value;
+    } else if (amt.trim()) {
+      unparseable.push(amt);
+    }
+  }
+
+  // Build result
+  const parts: string[] = [];
+
+  for (const [unit, value] of Object.entries(byUnit)) {
+    const formattedValue = formatNumber(value);
+    if (unit) {
+      parts.push(`${formattedValue} ${unit}`);
+    } else {
+      parts.push(formattedValue);
+    }
+  }
+
+  // Add unparseable amounts at the end
+  parts.push(...unparseable);
+
+  return parts.join(' + ');
 }
 
 const INITIAL_CATEGORIES = [
@@ -160,11 +325,12 @@ export function ShoppingList() {
   });
 
   // Aggregate ingredients by name (case-insensitive)
-  const aggregatedMap = new Map<string, AggregatedItem>();
+  // First pass: collect all amounts for each ingredient
+  const amountsMap = new Map<string, { name: string; amounts: string[]; category: string }>();
 
   allIngredients.forEach(ingredient => {
     const normalizedName = ingredient.name.toLowerCase().trim();
-    const existing = aggregatedMap.get(normalizedName);
+    const existing = amountsMap.get(normalizedName);
 
     const amountStr = [ingredient.amount, ingredient.unit]
       .filter(Boolean)
@@ -172,7 +338,7 @@ export function ShoppingList() {
       .trim();
 
     if (existing) {
-      if (amountStr && !existing.amounts.includes(amountStr)) {
+      if (amountStr) {
         existing.amounts.push(amountStr);
       }
     } else {
@@ -185,13 +351,24 @@ export function ShoppingList() {
         category = 'Other';
       }
 
-      aggregatedMap.set(normalizedName, {
+      amountsMap.set(normalizedName, {
         name: ingredient.name,
         amounts: amountStr ? [amountStr] : [],
         category,
-        key: normalizedName,
       });
     }
+  });
+
+  // Second pass: aggregate amounts and build final map
+  const aggregatedMap = new Map<string, AggregatedItem>();
+
+  amountsMap.forEach((item, normalizedName) => {
+    aggregatedMap.set(normalizedName, {
+      name: item.name,
+      displayAmount: aggregateAmounts(item.amounts),
+      category: item.category,
+      key: normalizedName,
+    });
   });
 
   // Add manual items to the map
@@ -208,7 +385,7 @@ export function ShoppingList() {
 
       aggregatedMap.set(key, {
         name: item.name,
-        amounts: item.quantity ? [item.quantity] : [],
+        displayAmount: item.quantity || '',
         category,
         key,
         isManual: true,
@@ -567,12 +744,9 @@ export function ShoppingList() {
                             }`}
                           >
                             {item.name}
-                            {item.amounts.length > 0 && (
+                            {item.displayAmount && (
                               <span className="text-gray-500 ml-2">
-                                ({item.amounts.length > 1
-                                  ? item.amounts.join(' + ')
-                                  : item.amounts[0]}
-                                {item.amounts.length > 1 && ` - ${item.amounts.length}x`})
+                                ({item.displayAmount})
                               </span>
                             )}
                           </span>
