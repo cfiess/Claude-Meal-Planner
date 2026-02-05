@@ -202,7 +202,6 @@ const LEGACY_CATEGORY_MAP: Record<string, string> = {
 };
 
 const CHECKED_STORAGE_KEY = 'shopping-list-checked';
-const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
 const CATEGORIES_KEY = 'shopping-list-categories';
 const MANUAL_ITEMS_KEY = 'shopping-list-manual-items';
 const SHOPPING_HISTORY_KEY = 'shopping-list-history';
@@ -214,7 +213,10 @@ interface ManualItem {
 }
 
 export function ShoppingList() {
-  const { state, getRecipeById } = useMealPlanner();
+  const { state, getRecipeById, setShoppingCategory } = useMealPlanner();
+
+  // Get category overrides from synced state
+  const categoryOverrides = state.shoppingCategoryOverrides || {};
 
   const [checkedItems, setCheckedItems] = useState<Set<string>>(() => {
     const stored = localStorage.getItem(CHECKED_STORAGE_KEY);
@@ -229,19 +231,6 @@ export function ShoppingList() {
       }
     }
     return new Set();
-  });
-
-  // Category overrides: ingredient key -> category name
-  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>(() => {
-    const stored = localStorage.getItem(CATEGORY_OVERRIDES_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        // Invalid data
-      }
-    }
-    return {};
   });
 
   // All categories (user can add, rename, delete)
@@ -293,10 +282,6 @@ export function ShoppingList() {
       })
     );
   }, [checkedItems, state.currentWeek.weekStartDate]);
-
-  useEffect(() => {
-    localStorage.setItem(CATEGORY_OVERRIDES_KEY, JSON.stringify(categoryOverrides));
-  }, [categoryOverrides]);
 
   useEffect(() => {
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
@@ -438,10 +423,7 @@ export function ShoppingList() {
   };
 
   const handleChangeCategory = (itemKey: string, newCategory: string) => {
-    setCategoryOverrides(prev => ({
-      ...prev,
-      [itemKey]: newCategory,
-    }));
+    setShoppingCategory(itemKey, newCategory);
     setEditingItem(null);
   };
 
@@ -480,15 +462,11 @@ export function ShoppingList() {
       setCategories(prev => prev.map(c => (c === editingCategory ? trimmed : c)));
 
       // Update all item overrides that reference the old category
-      setCategoryOverrides(prev => {
-        const updated = { ...prev };
-        for (const key in updated) {
-          if (updated[key] === editingCategory) {
-            updated[key] = trimmed;
-          }
+      for (const key in categoryOverrides) {
+        if (categoryOverrides[key] === editingCategory) {
+          setShoppingCategory(key, trimmed);
         }
-        return updated;
-      });
+      }
     }
 
     setEditingCategory(null);
@@ -508,15 +486,11 @@ export function ShoppingList() {
     setCategories(prev => prev.filter(c => c !== category));
 
     // Move items in this category to "Other"
-    setCategoryOverrides(prev => {
-      const updated = { ...prev };
-      for (const key in updated) {
-        if (updated[key] === category) {
-          updated[key] = 'Other';
-        }
+    for (const key in categoryOverrides) {
+      if (categoryOverrides[key] === category) {
+        setShoppingCategory(key, 'Other');
       }
-      return updated;
-    });
+    }
 
     setEditingCategory(null);
   };

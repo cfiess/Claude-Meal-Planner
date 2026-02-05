@@ -60,4 +60,5 @@ export interface MealPlannerState {
   nextWeek: WeekPlan;
   weekHistory: WeekPlan[];
   availableTags: string[];
+  shoppingCategoryOverrides?: Record<string, string>; // ingredientKey -> category name
 }

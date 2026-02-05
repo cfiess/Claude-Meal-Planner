@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Recipe, Ingredient } from '../types';
+import type { Recipe, Ingredient, GroceryCategory } from '../types';
 import { useMealPlanner } from '../context/MealPlannerContext';
 import { isValidUrl } from '../utils/helpers';
 import { parseRecipeFromUrl, parseRecipeFromText } from '../utils/recipeParser';
@@ -8,6 +8,10 @@ interface RecipeFormProps {
   existingRecipe?: Recipe;
   onClose: () => void;
 }
+
+const GROCERY_CATEGORIES: GroceryCategory[] = [
+  'produce', 'meat', 'dairy', 'bakery', 'frozen', 'pantry', 'beverages', 'condiments', 'other',
+];
 
 export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const { addRecipe, updateRecipe, state, addTag } = useMealPlanner();
@@ -41,6 +45,36 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
       setSelectedTags([...selectedTags, newTag.trim()]);
       setNewTag('');
     }
+  };
+
+  // Ingredient editing handlers
+  const handleAddIngredient = () => {
+    setIngredients([...ingredients, { name: '', amount: '', unit: '', category: 'other' }]);
+  };
+
+  const handleUpdateIngredient = (index: number, field: keyof Ingredient, value: string) => {
+    const updated = [...ingredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setIngredients(updated);
+  };
+
+  const handleRemoveIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+
+  // Step editing handlers
+  const handleAddStep = () => {
+    setSteps([...steps, '']);
+  };
+
+  const handleUpdateStep = (index: number, value: string) => {
+    const updated = [...steps];
+    updated[index] = value;
+    setSteps(updated);
+  };
+
+  const handleRemoveStep = (index: number) => {
+    setSteps(steps.filter((_, i) => i !== index));
   };
 
   const handleParseText = () => {
@@ -286,8 +320,62 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
             </div>
           </div>
 
-          {/* Parsed Ingredients Summary (read-only display) */}
-          {ingredients.length > 0 && (
+          {/* Ingredients - Editable for existing recipes, read-only summary for new */}
+          {existingRecipe ? (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ingredients
+              </label>
+              {ingredients.map((ingredient, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={ingredient.amount}
+                    onChange={e => handleUpdateIngredient(index, 'amount', e.target.value)}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                    placeholder="Amt"
+                  />
+                  <input
+                    type="text"
+                    value={ingredient.unit}
+                    onChange={e => handleUpdateIngredient(index, 'unit', e.target.value)}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                    placeholder="Unit"
+                  />
+                  <input
+                    type="text"
+                    value={ingredient.name}
+                    onChange={e => handleUpdateIngredient(index, 'name', e.target.value)}
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                    placeholder="Ingredient name"
+                  />
+                  <select
+                    value={ingredient.category}
+                    onChange={e => handleUpdateIngredient(index, 'category', e.target.value as GroceryCategory)}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                  >
+                    {GROCERY_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveIngredient(index)}
+                    className="px-2 py-1 text-red-600 hover:text-red-800"
+                  >
+                    X
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={handleAddIngredient}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                + Add Ingredient
+              </button>
+            </div>
+          ) : ingredients.length > 0 && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Parsed Ingredients ({ingredients.length})
@@ -307,8 +395,40 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
             </div>
           )}
 
-          {/* Parsed Steps Summary (read-only display) */}
-          {steps.length > 0 && (
+          {/* Steps - Editable for existing recipes, read-only summary for new */}
+          {existingRecipe ? (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Steps
+              </label>
+              {steps.map((step, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <span className="text-gray-500 py-1">{index + 1}.</span>
+                  <textarea
+                    value={step}
+                    onChange={e => handleUpdateStep(index, e.target.value)}
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm resize-none"
+                    rows={2}
+                    placeholder="Describe this step..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStep(index)}
+                    className="px-2 py-1 text-red-600 hover:text-red-800"
+                  >
+                    X
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={handleAddStep}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                + Add Step
+              </button>
+            </div>
+          ) : steps.length > 0 && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Parsed Steps ({steps.length})

@@ -77,6 +77,7 @@ type Action =
   | { type: 'REMOVE_TAG'; tag: string }
   | { type: 'UPDATE_TAG'; oldTag: string; newTag: string }
   | { type: 'RESET_TIMES_COOKED' }
+  | { type: 'SET_SHOPPING_CATEGORY'; itemKey: string; category: string }
   | { type: 'LOAD_STATE'; state: MealPlannerState };
 
 function reducer(state: MealPlannerState, action: Action): MealPlannerState {
@@ -200,6 +201,15 @@ function reducer(state: MealPlannerState, action: Action): MealPlannerState {
         recipes: state.recipes.map(r => ({ ...r, timesCooked: 0 })),
       };
 
+    case 'SET_SHOPPING_CATEGORY':
+      return {
+        ...state,
+        shoppingCategoryOverrides: {
+          ...state.shoppingCategoryOverrides,
+          [action.itemKey]: action.category,
+        },
+      };
+
     case 'LOAD_STATE':
       return action.state;
 
@@ -221,6 +231,7 @@ interface MealPlannerContextValue {
   removeTag: (tag: string) => void;
   updateTag: (oldTag: string, newTag: string) => void;
   resetTimesCooked: () => void;
+  setShoppingCategory: (itemKey: string, category: string) => void;
   getRecipeById: (id: string) => Recipe | undefined;
 }
 
@@ -423,6 +434,12 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
     saveToFirestore(newState);
   };
 
+  const setShoppingCategory = (itemKey: string, category: string) => {
+    const newState = reducer(state, { type: 'SET_SHOPPING_CATEGORY', itemKey, category });
+    dispatch({ type: 'SET_SHOPPING_CATEGORY', itemKey, category });
+    saveToFirestore(newState);
+  };
+
   const getRecipeById = (id: string) => {
     return state.recipes.find(r => r.id === id);
   };
@@ -442,6 +459,7 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
         removeTag,
         updateTag,
         resetTimesCooked,
+        setShoppingCategory,
         getRecipeById,
       }}
     >
