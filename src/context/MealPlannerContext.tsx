@@ -226,6 +226,26 @@ interface MealPlannerContextValue {
 
 const MealPlannerContext = createContext<MealPlannerContextValue | null>(null);
 
+// Remove undefined values recursively (Firestore doesn't accept undefined)
+function removeUndefined<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefined(item)) as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefined(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 export function MealPlannerProvider({ children }: { children: ReactNode }) {
   const { household } = useAuth();
   const [state, dispatch] = useReducer(reducer, getDefaultState());
@@ -279,8 +299,9 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
           };
           dispatch({ type: 'LOAD_STATE', state: newState });
           isLocalChange.current = true;
-          setDoc(docRef, newState);
-          lastSavedState.current = JSON.stringify(newState);
+          const cleanedNewState = removeUndefined(newState);
+          setDoc(docRef, cleanedNewState);
+          lastSavedState.current = JSON.stringify(cleanedNewState);
         } else {
           // Ensure nextWeek exists and has correct date
           if (!data.nextWeek || data.nextWeek.weekStartDate !== nextMonday) {
@@ -290,8 +311,9 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
             };
             dispatch({ type: 'LOAD_STATE', state: newState });
             isLocalChange.current = true;
-            setDoc(docRef, newState);
-            lastSavedState.current = JSON.stringify(newState);
+            const cleanedNewState = removeUndefined(newState);
+            setDoc(docRef, cleanedNewState);
+            lastSavedState.current = JSON.stringify(cleanedNewState);
           } else {
             dispatch({ type: 'LOAD_STATE', state: data });
           }
@@ -299,8 +321,9 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
       } else {
         const defaultState = getDefaultState();
         isLocalChange.current = true;
-        setDoc(docRef, defaultState);
-        lastSavedState.current = JSON.stringify(defaultState);
+        const cleanedDefault = removeUndefined(defaultState);
+        setDoc(docRef, cleanedDefault);
+        lastSavedState.current = JSON.stringify(cleanedDefault);
         dispatch({ type: 'LOAD_STATE', state: defaultState });
       }
       setLoading(false);
@@ -321,9 +344,11 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
 
     const docRef = doc(db, 'households', household.id, 'data', 'mealPlanner');
     try {
+      // Clean undefined values before saving (Firestore doesn't accept undefined)
+      const cleanedState = removeUndefined(newState);
       isLocalChange.current = true;
-      lastSavedState.current = JSON.stringify(newState);
-      await setDoc(docRef, newState);
+      lastSavedState.current = JSON.stringify(cleanedState);
+      await setDoc(docRef, cleanedState);
       setSyncError(null); // Clear any previous error on success
     } catch (error) {
       console.error('Error saving to Firestore:', error);
