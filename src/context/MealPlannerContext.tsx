@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef, useState, type ReactNode } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
@@ -211,6 +211,7 @@ function reducer(state: MealPlannerState, action: Action): MealPlannerState {
 interface MealPlannerContextValue {
   state: MealPlannerState;
   loading: boolean;
+  syncError: string | null;
   addRecipe: (recipe: Omit<Recipe, 'id' | 'timesCooked' | 'createdAt' | 'updatedAt'>) => void;
   updateRecipe: (recipe: Recipe) => void;
   deleteRecipe: (recipeId: string) => void;
@@ -228,7 +229,8 @@ const MealPlannerContext = createContext<MealPlannerContextValue | null>(null);
 export function MealPlannerProvider({ children }: { children: ReactNode }) {
   const { household } = useAuth();
   const [state, dispatch] = useReducer(reducer, getDefaultState());
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const isLocalChange = useRef(false);
   const lastSavedState = useRef<string>('');
@@ -311,16 +313,25 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
   }, [household]);
 
   const saveToFirestore = async (newState: MealPlannerState) => {
-    if (!household) return;
+    if (!household) {
+      console.error('No household - cannot save to Firestore');
+      setSyncError('Not connected to household. Please sign in again.');
+      return;
+    }
 
     const docRef = doc(db, 'households', household.id, 'data', 'mealPlanner');
     try {
       isLocalChange.current = true;
       lastSavedState.current = JSON.stringify(newState);
       await setDoc(docRef, newState);
+      setSyncError(null); // Clear any previous error on success
     } catch (error) {
       console.error('Error saving to Firestore:', error);
       isLocalChange.current = false;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setSyncError(`Failed to sync: ${errorMessage}. Changes saved locally only.`);
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setSyncError(null), 5000);
     }
   };
 
@@ -396,6 +407,7 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         loading,
+        syncError,
         addRecipe,
         updateRecipe,
         deleteRecipe,

@@ -21,7 +21,7 @@ const INITIAL_CATEGORIES = [
 ];
 
 export function Admin() {
-  const { state, addTag, removeTag, updateTag } = useMealPlanner();
+  const { state, addTag, removeTag, updateTag, resetTimesCooked } = useMealPlanner();
   const { household } = useAuth();
 
   const [editingTag, setEditingTag] = useState<string | null>(null);
@@ -109,10 +109,16 @@ export function Admin() {
     }
   };
 
+  const handleResetTimesCooked = () => {
+    if (confirm('Reset all meal counts to 0? This will clear the "Times Made" for all recipes.')) {
+      resetTimesCooked();
+    }
+  };
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Settings & Analytics</h2>
+    <div className="p-3 sm:p-6">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Settings & Analytics</h2>
         <span className="text-sm text-gray-400">v{APP_VERSION}</span>
       </div>
 
@@ -185,7 +191,17 @@ export function Admin() {
         <div className="space-y-8">
           {/* Meal Analytics */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">Meal Frequency</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-700">Meal Frequency</h3>
+              {sortedRecipes.some(r => r.timesCooked > 0) && (
+                <button
+                  onClick={handleResetTimesCooked}
+                  className="text-sm text-red-600 hover:text-red-800"
+                >
+                  Reset All Counts
+                </button>
+              )}
+            </div>
             {sortedRecipes.length === 0 ? (
               <p className="text-gray-500">No meals tracked yet. Add recipes and plan meals to see stats.</p>
             ) : (

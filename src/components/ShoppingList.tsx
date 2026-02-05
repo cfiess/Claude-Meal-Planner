@@ -554,10 +554,10 @@ export function ShoppingList() {
   const hasItems = totalItems > 0;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Shopping List</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Shopping List</h2>
           {hasItems && (
             <p className="text-gray-500">
               {checkedCount} of {totalItems} items checked

@@ -27,17 +27,17 @@ export function WeeklyPlanner() {
   const { state } = useMealPlanner();
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* This Week */}
-      <div className="mb-10">
-        <div className="mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">This Week</h2>
+      <div className="mb-8 sm:mb-10">
+        <div className="mb-3 sm:mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">This Week</h2>
           <p className="text-gray-500">
             Week of {getDayDate(state.currentWeek.weekStartDate, 0)}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {DAYS.map((day, index) => (
             <DayCard
               key={`current-${day}`}
@@ -52,15 +52,15 @@ export function WeeklyPlanner() {
       </div>
 
       {/* Next Week */}
-      <div className="border-t-4 border-blue-200 pt-8">
-        <div className="mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Next Week</h2>
+      <div className="border-t-4 border-blue-200 pt-6 sm:pt-8">
+        <div className="mb-3 sm:mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Next Week</h2>
           <p className="text-gray-500">
             Week of {getDayDate(state.nextWeek.weekStartDate, 0)}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {DAYS.map((day, index) => (
             <DayCard
               key={`next-${day}`}

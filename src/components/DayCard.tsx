@@ -114,11 +114,11 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+    <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 shadow-sm">
       {/* Header */}
-      <div className="mb-3">
+      <div className="mb-2 sm:mb-3">
         <h3 className="font-semibold text-gray-800">{label}</h3>
-        <p className="text-sm text-gray-500">{date}</p>
+        <p className="text-xs sm:text-sm text-gray-500">{date}</p>
       </div>
 
       {/* Dinner Section */}
