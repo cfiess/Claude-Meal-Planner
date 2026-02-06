@@ -22,6 +22,7 @@ export interface Recipe {
   link?: string;
   ingredients?: Ingredient[];
   steps?: string[];
+  notes?: string;
   tags: string[];
   timesCooked: number;
   createdAt: string;
@@ -61,4 +62,5 @@ export interface MealPlannerState {
   weekHistory: WeekPlan[];
   availableTags: string[];
   shoppingCategoryOverrides?: Record<string, string>; // ingredientKey -> category name
+  shoppingCategories?: string[]; // Custom shopping list categories
 }

@@ -127,6 +127,16 @@ export function RecipeDetail({ recipe, onClose, onEdit }: RecipeDetailProps) {
             </div>
           )}
 
+          {/* Notes */}
+          {recipe.notes && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-700 mb-2">Notes</h3>
+              <p className="text-gray-600 whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded-md p-3">
+                {recipe.notes}
+              </p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button

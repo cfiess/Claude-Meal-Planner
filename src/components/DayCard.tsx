@@ -12,7 +12,7 @@ interface DayCardProps {
 }
 
 export function DayCard({ day, label, date, plan, week }: DayCardProps) {
-  const { state, setDayDinner, setDayLunch, getRecipeById } = useMealPlanner();
+  const { state, setDayDinner, setDayLunch, getRecipeById, updateRecipe } = useMealPlanner();
 
   const [dinnerInput, setDinnerInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -96,10 +96,19 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
 
   const handleNotesBlur = () => {
     if (notesInput !== plan.dinner.notes) {
+      // Update the day's dinner notes
       setDayDinner(day, {
         ...plan.dinner,
         notes: notesInput || undefined,
       }, week);
+
+      // Also save notes to the recipe if there's a linked recipe
+      if (currentRecipe && notesInput.trim()) {
+        updateRecipe({
+          ...currentRecipe,
+          notes: notesInput.trim(),
+        });
+      }
     }
   };
 

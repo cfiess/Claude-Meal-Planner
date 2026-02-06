@@ -49,8 +49,10 @@ export function Admin() {
     localStorage.setItem(SHOPPING_HISTORY_KEY, JSON.stringify(shoppingHistory));
   }, [shoppingHistory]);
 
-  // Sort recipes by times cooked
-  const sortedRecipes = [...state.recipes].sort((a, b) => b.timesCooked - a.timesCooked);
+  // Sort recipes by times cooked (descending) and filter to only those that have been cooked
+  const sortedRecipes = [...state.recipes]
+    .filter(r => r.timesCooked > 0)
+    .sort((a, b) => b.timesCooked - a.timesCooked);
 
   // Sort shopping history by count
   const sortedShoppingHistory = Object.entries(shoppingHistory)

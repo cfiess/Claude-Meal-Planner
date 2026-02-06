@@ -202,7 +202,6 @@ const LEGACY_CATEGORY_MAP: Record<string, string> = {
 };
 
 const CHECKED_STORAGE_KEY = 'shopping-list-checked';
-const CATEGORIES_KEY = 'shopping-list-categories';
 const MANUAL_ITEMS_KEY = 'shopping-list-manual-items';
 const SHOPPING_HISTORY_KEY = 'shopping-list-history';
 
@@ -213,10 +212,13 @@ interface ManualItem {
 }
 
 export function ShoppingList() {
-  const { state, getRecipeById, setShoppingCategory } = useMealPlanner();
+  const { state, getRecipeById, setShoppingCategory, setShoppingCategories } = useMealPlanner();
 
   // Get category overrides from synced state
   const categoryOverrides = state.shoppingCategoryOverrides || {};
+
+  // Get categories from synced state, fallback to initial if not set
+  const categories = state.shoppingCategories || INITIAL_CATEGORIES;
 
   const [checkedItems, setCheckedItems] = useState<Set<string>>(() => {
     const stored = localStorage.getItem(CHECKED_STORAGE_KEY);
@@ -231,19 +233,6 @@ export function ShoppingList() {
       }
     }
     return new Set();
-  });
-
-  // All categories (user can add, rename, delete)
-  const [categories, setCategories] = useState<string[]>(() => {
-    const stored = localStorage.getItem(CATEGORIES_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        // Invalid data
-      }
-    }
-    return INITIAL_CATEGORIES;
   });
 
   // Manual items (user-added, not from recipes)
@@ -282,10 +271,6 @@ export function ShoppingList() {
       })
     );
   }, [checkedItems, state.currentWeek.weekStartDate]);
-
-  useEffect(() => {
-    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
-  }, [categories]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -401,18 +386,13 @@ export function ShoppingList() {
   // Get categories that have items, in order
   const categoriesWithItems = categories.filter(cat => groupedItems[cat]?.length > 0);
 
-  const handleToggleItem = (key: string, itemName: string) => {
+  const handleToggleItem = (key: string) => {
     setCheckedItems(prev => {
       const newSet = new Set(prev);
       if (newSet.has(key)) {
         newSet.delete(key);
       } else {
         newSet.add(key);
-        // Track in cumulative shopping history when item is checked
-        const history = JSON.parse(localStorage.getItem(SHOPPING_HISTORY_KEY) || '{}');
-        const normalizedName = itemName.toLowerCase().trim();
-        history[normalizedName] = (history[normalizedName] || 0) + 1;
-        localStorage.setItem(SHOPPING_HISTORY_KEY, JSON.stringify(history));
       }
       return newSet;
     });
@@ -420,6 +400,32 @@ export function ShoppingList() {
 
   const handleClearChecked = () => {
     setCheckedItems(new Set());
+  };
+
+  const handleMarkPurchased = () => {
+    if (checkedItems.size === 0) return;
+
+    // Record all checked items to shopping history
+    const history = JSON.parse(localStorage.getItem(SHOPPING_HISTORY_KEY) || '{}');
+
+    checkedItems.forEach(key => {
+      // Find the item to get its name
+      const item = aggregatedMap.get(key);
+      if (item) {
+        const normalizedName = item.name.toLowerCase().trim();
+        history[normalizedName] = (history[normalizedName] || 0) + 1;
+      }
+    });
+
+    localStorage.setItem(SHOPPING_HISTORY_KEY, JSON.stringify(history));
+
+    const count = checkedItems.size;
+
+    // Clear the checked items
+    setCheckedItems(new Set());
+
+    // Show brief feedback
+    alert(`${count} item${count !== 1 ? 's' : ''} marked as purchased and added to Shopping History!`);
   };
 
   const handleChangeCategory = (itemKey: string, newCategory: string) => {
@@ -430,7 +436,7 @@ export function ShoppingList() {
   const handleAddCategory = () => {
     const trimmed = newCategoryName.trim();
     if (trimmed && !categories.includes(trimmed)) {
-      setCategories(prev => [...prev, trimmed]);
+      setShoppingCategories([...categories, trimmed]);
       setNewCategoryName('');
       setShowAddCategory(false);
     }
@@ -459,7 +465,7 @@ export function ShoppingList() {
       }
 
       // Update categories list
-      setCategories(prev => prev.map(c => (c === editingCategory ? trimmed : c)));
+      setShoppingCategories(categories.map(c => (c === editingCategory ? trimmed : c)));
 
       // Update all item overrides that reference the old category
       for (const key in categoryOverrides) {
@@ -483,7 +489,7 @@ export function ShoppingList() {
     }
 
     // Remove category
-    setCategories(prev => prev.filter(c => c !== category));
+    setShoppingCategories(categories.filter(c => c !== category));
 
     // Move items in this category to "Other"
     for (const key in categoryOverrides) {
@@ -539,8 +545,46 @@ export function ShoppingList() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
-          {showAddItem ? (
-            <div className="flex gap-2 items-center">
+          {!showAddItem && !showAddCategory && (
+            <>
+              <button
+                onClick={() => setShowAddItem(true)}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                +Add Item
+              </button>
+              <button
+                onClick={() => setShowAddCategory(true)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                +Category
+              </button>
+              {checkedCount > 0 && (
+                <>
+                  <button
+                    onClick={handleMarkPurchased}
+                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    Purchased
+                  </button>
+                  <button
+                    onClick={handleClearChecked}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Clear
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Add Item Form - Full width below header on mobile */}
+      {showAddItem && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex gap-2 flex-1">
               <input
                 type="text"
                 value={newItemQty}
@@ -553,17 +597,19 @@ export function ShoppingList() {
                 value={newItemName}
                 onChange={e => setNewItemName(e.target.value)}
                 placeholder="Item name..."
-                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleAddItem();
                   if (e.key === 'Escape') setShowAddItem(false);
                 }}
                 autoFocus
               />
+            </div>
+            <div className="flex gap-2">
               <select
                 value={newItemCategory}
                 onChange={e => setNewItemCategory(e.target.value)}
-                className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 sm:flex-none px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {categories.map(cat => (
                   <option key={cat} value={cat}>
@@ -581,62 +627,44 @@ export function ShoppingList() {
                 onClick={() => setShowAddItem(false)}
                 className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
               >
-                Cancel
+                X
               </button>
             </div>
-          ) : (
-            <button
-              onClick={() => setShowAddItem(true)}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              +Add Item
-            </button>
-          )}
-          {showAddCategory ? (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={e => setNewCategoryName(e.target.value)}
-                placeholder="Category name..."
-                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleAddCategory();
-                  if (e.key === 'Escape') setShowAddCategory(false);
-                }}
-                autoFocus
-              />
-              <button
-                onClick={handleAddCategory}
-                className="px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => setShowAddCategory(false)}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAddCategory(true)}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              +Add Category
-            </button>
-          )}
-          {checkedCount > 0 && (
-            <button
-              onClick={handleClearChecked}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Clear Checked
-            </button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Add Category Form - Full width below header on mobile */}
+      {showAddCategory && (
+        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={e => setNewCategoryName(e.target.value)}
+              placeholder="Category name..."
+              className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleAddCategory();
+                if (e.key === 'Escape') setShowAddCategory(false);
+              }}
+              autoFocus
+            />
+            <button
+              onClick={handleAddCategory}
+              className="px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Add
+            </button>
+            <button
+              onClick={() => setShowAddCategory(false)}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              X
+            </button>
+          </div>
+        </div>
+      )}
 
       {!hasItems ? (
         <div className="text-center py-12 text-gray-500">
@@ -709,7 +737,7 @@ export function ShoppingList() {
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => handleToggleItem(item.key, item.name)}
+                            onChange={() => handleToggleItem(item.key)}
                             className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                           />
                           <span

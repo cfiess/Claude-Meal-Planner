@@ -9,12 +9,41 @@ interface RecipeFormProps {
   onClose: () => void;
 }
 
-const GROCERY_CATEGORIES: GroceryCategory[] = [
-  'produce', 'meat', 'dairy', 'bakery', 'frozen', 'pantry', 'beverages', 'condiments', 'other',
-];
+// Map display names back to legacy keys for storage
+const DISPLAY_TO_LEGACY: Record<string, GroceryCategory> = {
+  'Produce': 'produce',
+  'Meat & Seafood': 'meat',
+  'Dairy & Eggs': 'dairy',
+  'Bakery': 'bakery',
+  'Frozen': 'frozen',
+  'Pantry': 'pantry',
+  'Canned Goods': 'pantry',
+  'Beverages': 'beverages',
+  'Condiments & Sauces': 'condiments',
+  'Other': 'other',
+};
+
+// Map legacy keys to display names
+const LEGACY_TO_DISPLAY: Record<string, string> = {
+  'produce': 'Produce',
+  'meat': 'Meat & Seafood',
+  'dairy': 'Dairy & Eggs',
+  'bakery': 'Bakery',
+  'frozen': 'Frozen',
+  'pantry': 'Pantry',
+  'beverages': 'Beverages',
+  'condiments': 'Condiments & Sauces',
+  'other': 'Other',
+};
 
 export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const { addRecipe, updateRecipe, state, addTag } = useMealPlanner();
+
+  // Get shopping categories from state for the dropdown
+  const shoppingCategories = state.shoppingCategories || [
+    'Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery', 'Frozen',
+    'Pantry', 'Canned Goods', 'Beverages', 'Condiments & Sauces', 'Other'
+  ];
 
   const [name, setName] = useState(existingRecipe?.name || '');
   const [link, setLink] = useState(existingRecipe?.link || '');
@@ -25,6 +54,7 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>(
     existingRecipe?.tags || []
   );
+  const [notes, setNotes] = useState(existingRecipe?.notes || '');
   const [newTag, setNewTag] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState('');
@@ -137,6 +167,7 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
       link: link.trim() || undefined,
       ingredients: ingredients.filter(i => i.name.trim()),
       steps: steps.filter(s => s.trim()),
+      notes: notes.trim() || undefined,
       tags: selectedTags,
     };
 
@@ -156,9 +187,20 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit} className="p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            {existingRecipe ? 'Edit Recipe' : 'Add Recipe'}
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">
+              {existingRecipe ? 'Edit Recipe' : 'Add Recipe'}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
           {/* Import from URL - only show for new recipes */}
           {!existingRecipe && (
@@ -350,11 +392,15 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
                     placeholder="Ingredient name"
                   />
                   <select
-                    value={ingredient.category}
-                    onChange={e => handleUpdateIngredient(index, 'category', e.target.value as GroceryCategory)}
-                    className="w-24 px-2 py-1 border border-gray-300 rounded-md text-sm"
+                    value={LEGACY_TO_DISPLAY[ingredient.category] || ingredient.category}
+                    onChange={e => {
+                      const displayValue = e.target.value;
+                      const legacyValue = DISPLAY_TO_LEGACY[displayValue] || displayValue as GroceryCategory;
+                      handleUpdateIngredient(index, 'category', legacyValue);
+                    }}
+                    className="w-28 px-2 py-1 border border-gray-300 rounded-md text-sm"
                   >
-                    {GROCERY_CATEGORIES.map(cat => (
+                    {shoppingCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -445,6 +491,25 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
                   )}
                 </ol>
               </div>
+            </div>
+          )}
+
+          {/* Notes - Only show for existing recipes or if notes exist */}
+          {existingRecipe && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Add personal notes, tips, or modifications..."
+                rows={3}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Notes added from Weekly Plan will appear here
+              </p>
             </div>
           )}
 
