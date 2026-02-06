@@ -2,19 +2,26 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export function Login() {
-  const { user, household, signInWithGoogle, signOut, createHousehold, joinHousehold } = useAuth();
+  const { user, household, authError, signInWithGoogle, signOut, createHousehold, joinHousehold } = useAuth();
   const [householdName, setHouseholdName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [showJoin, setShowJoin] = useState(false);
   const [error, setError] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  // Display either local error or auth error from context
+  const displayError = error || authError;
 
   const handleSignIn = async () => {
     try {
       setError('');
+      setIsSigningIn(true);
       await signInWithGoogle();
     } catch (err) {
-      setError('Failed to sign in. Please try again.');
+      // Error is already set in authError from context
       console.error(err);
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -56,15 +63,16 @@ export function Login() {
             <p className="text-gray-600">Plan your weekly meals together</p>
           </div>
 
-          {error && (
+          {displayError && (
             <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
-              {error}
+              {displayError}
             </div>
           )}
 
           <button
             onClick={handleSignIn}
-            className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={isSigningIn}
+            className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -84,7 +92,9 @@ export function Login() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            <span className="text-gray-700 font-medium">Sign in with Google</span>
+            <span className="text-gray-700 font-medium">
+              {isSigningIn ? 'Signing in...' : 'Sign in with Google'}
+            </span>
           </button>
         </div>
       </div>
@@ -101,9 +111,9 @@ export function Login() {
             <p className="text-gray-600">Set up your household to get started</p>
           </div>
 
-          {error && (
+          {displayError && (
             <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
-              {error}
+              {displayError}
             </div>
           )}
 

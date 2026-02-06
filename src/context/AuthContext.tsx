@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User
@@ -19,6 +21,7 @@ interface AuthContextType {
   user: User | null;
   household: Household | null;
   loading: boolean;
+  authError: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   createHousehold: (name: string) => Promise<void>;
@@ -27,10 +30,44 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Helper to create user document
+async function ensureUserDocument(user: User) {
+  const userRef = doc(db, 'users', user.uid);
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    await setDoc(userRef, {
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [household, setHousehold] = useState<Household | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Handle redirect result on app load (for mobile browsers)
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          await ensureUserDocument(result.user);
+        }
+      } catch (error) {
+        // Ignore "missing initial state" errors - expected on fresh page loads
+        const firebaseError = error as { code?: string };
+        if (firebaseError.code !== 'auth/missing-initial-state') {
+          console.error('Redirect result error:', error);
+        }
+      }
+    };
+    handleRedirectResult();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -59,25 +96,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+    setAuthError(null);
 
-      // Create user document if it doesn't exist
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
+    // Detect if we're on mobile/Safari where popups often fail
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-      if (!userDoc.exists()) {
-        await setDoc(userRef, {
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          createdAt: new Date().toISOString(),
-        });
+    // Use redirect for mobile Safari, popup for others
+    if (isMobile && isSafari) {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (error) {
+        console.error('Redirect sign-in error:', error);
+        const firebaseError = error as { message?: string };
+        setAuthError(firebaseError.message || 'Sign in failed. Please try again.');
+        throw error;
       }
-    } catch (error) {
-      console.error('Error signing in with Google:', error);
-      throw error;
+    } else {
+      // Try popup first, fall back to redirect if blocked
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        await ensureUserDocument(result.user);
+      } catch (error: unknown) {
+        const firebaseError = error as { code?: string; message?: string };
+        console.error('Popup sign-in error:', firebaseError);
+
+        // If popup was blocked, try redirect
+        if (
+          firebaseError.code === 'auth/popup-blocked' ||
+          firebaseError.code === 'auth/popup-closed-by-user' ||
+          firebaseError.code === 'auth/cancelled-popup-request'
+        ) {
+          try {
+            await signInWithRedirect(auth, googleProvider);
+          } catch (redirectError) {
+            console.error('Redirect sign-in error:', redirectError);
+            setAuthError('Unable to sign in. Please try again.');
+            throw redirectError;
+          }
+        } else {
+          setAuthError(firebaseError.message || 'Sign in failed. Please try again.');
+          throw error;
+        }
+      }
     }
   };
 
@@ -156,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         household,
         loading,
+        authError,
         signInWithGoogle,
         signOut,
         createHousehold,
