@@ -583,21 +583,21 @@ export function ShoppingList() {
       {/* Add Item Form - Full width below header on mobile */}
       {showAddItem && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex gap-2 flex-1">
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={newItemQty}
                 onChange={e => setNewItemQty(e.target.value)}
                 placeholder="Qty"
-                className="w-16 px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-16 px-2 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="text"
                 value={newItemName}
                 onChange={e => setNewItemName(e.target.value)}
                 placeholder="Item name..."
-                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 min-w-0 px-3 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleAddItem();
                   if (e.key === 'Escape') setShowAddItem(false);
@@ -609,7 +609,7 @@ export function ShoppingList() {
               <select
                 value={newItemCategory}
                 onChange={e => setNewItemCategory(e.target.value)}
-                className="flex-1 sm:flex-none px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-2 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {categories.map(cat => (
                   <option key={cat} value={cat}>
@@ -619,13 +619,13 @@ export function ShoppingList() {
               </select>
               <button
                 onClick={handleAddItem}
-                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 text-base bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 Add
               </button>
               <button
                 onClick={() => setShowAddItem(false)}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+                className="px-3 py-2 text-base text-gray-600 hover:text-gray-800"
               >
                 X
               </button>
@@ -643,7 +643,7 @@ export function ShoppingList() {
               value={newCategoryName}
               onChange={e => setNewCategoryName(e.target.value)}
               placeholder="Category name..."
-              className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 min-w-0 px-3 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               onKeyDown={e => {
                 if (e.key === 'Enter') handleAddCategory();
                 if (e.key === 'Escape') setShowAddCategory(false);

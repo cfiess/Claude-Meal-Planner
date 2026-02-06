@@ -369,48 +369,52 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
                 Ingredients
               </label>
               {ingredients.map((ingredient, index) => (
-                <div key={index} className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={ingredient.amount}
-                    onChange={e => handleUpdateIngredient(index, 'amount', e.target.value)}
-                    className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                    placeholder="Amt"
-                  />
-                  <input
-                    type="text"
-                    value={ingredient.unit}
-                    onChange={e => handleUpdateIngredient(index, 'unit', e.target.value)}
-                    className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                    placeholder="Unit"
-                  />
-                  <input
-                    type="text"
-                    value={ingredient.name}
-                    onChange={e => handleUpdateIngredient(index, 'name', e.target.value)}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                    placeholder="Ingredient name"
-                  />
-                  <select
-                    value={LEGACY_TO_DISPLAY[ingredient.category] || ingredient.category}
-                    onChange={e => {
-                      const displayValue = e.target.value;
-                      const legacyValue = DISPLAY_TO_LEGACY[displayValue] || displayValue as GroceryCategory;
-                      handleUpdateIngredient(index, 'category', legacyValue);
-                    }}
-                    className="w-28 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                  >
-                    {shoppingCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveIngredient(index)}
-                    className="px-2 py-1 text-red-600 hover:text-red-800"
-                  >
-                    X
-                  </button>
+                <div key={index} className="mb-3 p-2 bg-gray-50 rounded-md">
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={ingredient.amount}
+                      onChange={e => handleUpdateIngredient(index, 'amount', e.target.value)}
+                      className="w-16 px-2 py-2 border border-gray-300 rounded-md text-base"
+                      placeholder="Amt"
+                    />
+                    <input
+                      type="text"
+                      value={ingredient.unit}
+                      onChange={e => handleUpdateIngredient(index, 'unit', e.target.value)}
+                      className="w-20 px-2 py-2 border border-gray-300 rounded-md text-base"
+                      placeholder="Unit"
+                    />
+                    <input
+                      type="text"
+                      value={ingredient.name}
+                      onChange={e => handleUpdateIngredient(index, 'name', e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-md text-base"
+                      placeholder="Ingredient name"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={LEGACY_TO_DISPLAY[ingredient.category] || ingredient.category}
+                      onChange={e => {
+                        const displayValue = e.target.value;
+                        const legacyValue = DISPLAY_TO_LEGACY[displayValue] || displayValue as GroceryCategory;
+                        handleUpdateIngredient(index, 'category', legacyValue);
+                      }}
+                      className="flex-1 px-2 py-2 border border-gray-300 rounded-md text-base"
+                    >
+                      {shoppingCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveIngredient(index)}
+                      className="px-3 py-2 text-red-600 hover:text-red-800 bg-red-50 rounded-md"
+                    >
+                      X
+                    </button>
+                  </div>
                 </div>
               ))}
               <button
@@ -448,22 +452,24 @@ export function RecipeForm({ existingRecipe, onClose }: RecipeFormProps) {
                 Steps
               </label>
               {steps.map((step, index) => (
-                <div key={index} className="flex gap-2 mb-2">
-                  <span className="text-gray-500 py-1">{index + 1}.</span>
-                  <textarea
-                    value={step}
-                    onChange={e => handleUpdateStep(index, e.target.value)}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm resize-none"
-                    rows={2}
-                    placeholder="Describe this step..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveStep(index)}
-                    className="px-2 py-1 text-red-600 hover:text-red-800"
-                  >
-                    X
-                  </button>
+                <div key={index} className="mb-3 p-2 bg-gray-50 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-500 py-2 font-medium">{index + 1}.</span>
+                    <textarea
+                      value={step}
+                      onChange={e => handleUpdateStep(index, e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-md text-base resize-none"
+                      rows={3}
+                      placeholder="Describe this step..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveStep(index)}
+                      className="px-3 py-2 text-red-600 hover:text-red-800 bg-red-50 rounded-md"
+                    >
+                      X
+                    </button>
+                  </div>
                 </div>
               ))}
               <button

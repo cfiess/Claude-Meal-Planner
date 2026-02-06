@@ -16,7 +16,6 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
 
   const [dinnerInput, setDinnerInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [notesInput, setNotesInput] = useState(plan.dinner.notes || '');
   const [showNotes, setShowNotes] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -27,6 +26,15 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
   const dinnerDisplay =
     currentRecipe?.name || plan.dinner.customMealName || '';
   const dinnerLink = currentRecipe?.link || plan.dinner.customLink;
+
+  // Get notes - prefer day notes, fall back to recipe notes
+  const displayNotes = plan.dinner.notes || currentRecipe?.notes || '';
+  const [notesInput, setNotesInput] = useState(displayNotes);
+
+  // Update notesInput when recipe or plan changes
+  useEffect(() => {
+    setNotesInput(plan.dinner.notes || currentRecipe?.notes || '');
+  }, [plan.dinner.notes, currentRecipe?.notes]);
 
   // Sort recipes by times cooked for dropdown
   const sortedRecipes = [...state.recipes].sort((a, b) => {
@@ -95,7 +103,7 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
   };
 
   const handleNotesBlur = () => {
-    if (notesInput !== plan.dinner.notes) {
+    if (notesInput !== displayNotes) {
       // Update the day's dinner notes
       setDayDinner(day, {
         ...plan.dinner,
@@ -193,7 +201,7 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
             )}
 
             {/* Notes */}
-            {(plan.dinner.notes || showNotes) && (
+            {(displayNotes || showNotes) && (
               <textarea
                 value={notesInput}
                 onChange={e => setNotesInput(e.target.value)}
@@ -203,7 +211,7 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
                 rows={2}
               />
             )}
-            {!plan.dinner.notes && !showNotes && (
+            {!displayNotes && !showNotes && (
               <button
                 onClick={() => setShowNotes(true)}
                 className="block text-sm text-gray-500 hover:text-gray-700 mt-2"

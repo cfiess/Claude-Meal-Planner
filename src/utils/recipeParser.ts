@@ -112,9 +112,12 @@ function parseIngredientString(str: string): Ingredient {
 
 export async function parseRecipeFromUrl(url: string): Promise<ParsedRecipe | null> {
   try {
+    // Normalize URL - remove trailing slash if present
+    const normalizedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+
     // Use a CORS proxy to fetch the page
     // In production, you'd want your own backend for this
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(normalizedUrl)}`;
 
     const response = await fetch(proxyUrl);
     if (!response.ok) {
