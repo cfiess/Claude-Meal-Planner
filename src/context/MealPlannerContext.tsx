@@ -306,14 +306,34 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
           // Increment times cooked for recipes in the archived week
           const updatedRecipes = incrementRecipeCounts(data.recipes, data.currentWeek);
 
+          // Check if nextWeek has any planned meals
+          const nextWeekHasMeals = data.nextWeek && Object.values(data.nextWeek.days).some(
+            day => day.dinner.recipeId || day.dinner.customMealName || day.lunch
+          );
+
+          // Determine what to use for the new current week:
+          // 1. If nextWeek has meals planned, use it (preserve user's planned meals!)
+          // 2. If nextWeek date exactly matches, use it
+          // 3. Otherwise create empty week
+          let newCurrentWeek: WeekPlan;
+          if (nextWeekHasMeals && data.nextWeek) {
+            // Preserve planned meals from nextWeek, update the weekStartDate
+            newCurrentWeek = {
+              ...data.nextWeek,
+              weekStartDate: currentMonday,
+            };
+          } else if (data.nextWeek?.weekStartDate === currentMonday) {
+            newCurrentWeek = data.nextWeek;
+          } else {
+            newCurrentWeek = createEmptyWeek(currentMonday);
+          }
+
           // Archive current week, move next week to current, create new next week
           const newState: MealPlannerState = {
             ...data,
             recipes: updatedRecipes,
             weekHistory: [data.currentWeek, ...data.weekHistory],
-            currentWeek: data.nextWeek?.weekStartDate === currentMonday
-              ? data.nextWeek
-              : createEmptyWeek(currentMonday),
+            currentWeek: newCurrentWeek,
             nextWeek: createEmptyWeek(nextMonday),
           };
           dispatch({ type: 'LOAD_STATE', state: newState });
