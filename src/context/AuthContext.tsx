@@ -74,19 +74,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user);
 
       if (user) {
-        // Ensure user document exists (handles redirect sign-in race condition)
-        await ensureUserDocument(user);
+        try {
+          // Ensure user document exists (handles redirect sign-in race condition)
+          await ensureUserDocument(user);
 
-        // Check if user has a household
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          if (userData.householdId) {
-            const householdDoc = await getDoc(doc(db, 'households', userData.householdId));
-            if (householdDoc.exists()) {
-              setHousehold({ id: householdDoc.id, ...householdDoc.data() } as Household);
+          // Check if user has a household
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.householdId) {
+              const householdDoc = await getDoc(doc(db, 'households', userData.householdId));
+              if (householdDoc.exists()) {
+                setHousehold({ id: householdDoc.id, ...householdDoc.data() } as Household);
+              }
             }
           }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+          // Still allow the user to proceed - they're authenticated
         }
       } else {
         setHousehold(null);
