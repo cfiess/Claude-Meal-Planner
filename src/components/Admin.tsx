@@ -446,6 +446,31 @@ export function Admin() {
       {/* Household Section */}
       {activeSection === 'household' && household && (
         <div className="space-y-6">
+          {/* Important warning box */}
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4">
+            <h3 className="text-amber-800 font-semibold mb-2">Save Your Household Code!</h3>
+            <p className="text-amber-700 text-sm mb-3">
+              This code is the <strong>only way</strong> to access your recipes and meal plans.
+              If you clear your browser data, use a new device, or reinstall the app, you'll need
+              this code to recover your data.
+            </p>
+            <div className="flex gap-2 items-center">
+              <code className="bg-white px-3 py-2 rounded-md text-sm font-mono flex-1 break-all border border-amber-200">
+                {household.id}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(household.id);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 text-sm whitespace-nowrap font-medium"
+              >
+                {copied ? 'Copied!' : 'Copy Code'}
+              </button>
+            </div>
+          </div>
+
           <div>
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Household Info</h3>
             <p className="text-gray-600 mb-4">

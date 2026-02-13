@@ -89,6 +89,15 @@ export function Login() {
             >
               {isLoading ? 'Creating...' : 'Create New Household'}
             </button>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+              <p className="text-amber-800 font-medium mb-1">Important: Save your household code!</p>
+              <p className="text-amber-700">
+                After creating a household, go to Settings &rarr; Household to copy your code.
+                You'll need it to access your data from other devices or if you clear your browser.
+              </p>
+            </div>
+
             <div className="text-center">
               <button
                 onClick={() => { setShowJoin(true); setError(''); }}
@@ -114,7 +123,7 @@ export function Login() {
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Ask your partner for the household code from their Settings page
+                Paste your household code to join or recover access to your data
               </p>
             </div>
             <button
@@ -124,6 +133,15 @@ export function Login() {
             >
               {isLoading ? 'Joining...' : 'Join Household'}
             </button>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+              <p className="text-blue-800 font-medium mb-1">Lost access to your data?</p>
+              <p className="text-blue-700">
+                If you previously had a household and can't see your recipes, enter your
+                old household code here to recover access. The code looks like "household_..."
+              </p>
+            </div>
+
             <div className="text-center">
               <button
                 onClick={() => { setShowJoin(false); setError(''); }}

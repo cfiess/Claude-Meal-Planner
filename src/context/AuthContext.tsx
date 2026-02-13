@@ -82,9 +82,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sign in anonymously if not already signed in
       let currentUser = user;
       if (!currentUser) {
-        const result = await signInAnonymously(auth);
-        currentUser = result.user;
-        setUser(currentUser);
+        try {
+          const result = await signInAnonymously(auth);
+          currentUser = result.user;
+          setUser(currentUser);
+        } catch (authError: unknown) {
+          // Handle specific Firebase auth errors with user-friendly messages
+          const errorCode = (authError as { code?: string })?.code;
+          if (errorCode === 'auth/admin-restricted-operation') {
+            throw new Error(
+              'Anonymous sign-in is not enabled. Please ask the app administrator to enable Anonymous Authentication in Firebase Console → Authentication → Sign-in method.'
+            );
+          }
+          throw authError;
+        }
       }
 
       const householdId = `household_${currentUser.uid}_${Date.now()}`;
@@ -130,9 +141,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sign in anonymously if not already signed in
       let currentUser = user;
       if (!currentUser) {
-        const result = await signInAnonymously(auth);
-        currentUser = result.user;
-        setUser(currentUser);
+        try {
+          const result = await signInAnonymously(auth);
+          currentUser = result.user;
+          setUser(currentUser);
+        } catch (authError: unknown) {
+          // Handle specific Firebase auth errors with user-friendly messages
+          const errorCode = (authError as { code?: string })?.code;
+          if (errorCode === 'auth/admin-restricted-operation') {
+            throw new Error(
+              'Anonymous sign-in is not enabled. Please ask the app administrator to enable Anonymous Authentication in Firebase Console → Authentication → Sign-in method.'
+            );
+          }
+          throw authError;
+        }
       }
 
       const householdRef = doc(db, 'households', householdId);
