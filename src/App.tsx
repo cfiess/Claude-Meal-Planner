@@ -191,7 +191,7 @@ function MainApp() {
 }
 
 function AppContent() {
-  const { user, household, loading } = useAuth();
+  const { household, loading } = useAuth();
 
   if (loading) {
     return (
@@ -204,8 +204,8 @@ function AppContent() {
     );
   }
 
-  // Show login/household setup if not authenticated or no household
-  if (!user || !household) {
+  // Show login/household setup if no household
+  if (!household) {
     return <Login />;
   }
 

@@ -1,14 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
+  signInAnonymously,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 
 interface Household {
   id: string;
@@ -22,7 +20,6 @@ interface AuthContextType {
   household: Household | null;
   loading: boolean;
   authError: string | null;
-  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   createHousehold: (name: string) => Promise<void>;
   joinHousehold: (householdId: string) => Promise<void>;
@@ -30,54 +27,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Helper to create user document
-async function ensureUserDocument(user: User) {
-  const userRef = doc(db, 'users', user.uid);
-  const userDoc = await getDoc(userRef);
-  if (!userDoc.exists()) {
-    await setDoc(userRef, {
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      createdAt: new Date().toISOString(),
-    });
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [household, setHousehold] = useState<Household | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Handle redirect result on app load (for mobile browsers)
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          await ensureUserDocument(result.user);
-        }
-      } catch (error) {
-        // Ignore "missing initial state" errors - expected on fresh page loads
-        const firebaseError = error as { code?: string };
-        if (firebaseError.code !== 'auth/missing-initial-state') {
-          console.error('Redirect result error:', error);
-        }
-      }
-    };
-    handleRedirectResult();
-  }, []);
-
+  // Listen for auth state changes (works for both existing Google users and anonymous users)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
 
       if (user) {
         try {
-          // Ensure user document exists (handles redirect sign-in race condition)
-          await ensureUserDocument(user);
-
           // Check if user has a household
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
@@ -103,47 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signInWithGoogle = async () => {
-    setAuthError(null);
-
-    // Use redirect for ALL mobile devices - popups are unreliable on mobile
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      try {
-        await signInWithRedirect(auth, googleProvider);
-      } catch (error) {
-        console.error('Redirect sign-in error:', error);
-        const firebaseError = error as { message?: string };
-        setAuthError(firebaseError.message || 'Sign in failed. Please try again.');
-      }
-    } else {
-      // Desktop: try popup first, fall back to redirect if blocked
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        await ensureUserDocument(result.user);
-      } catch (error: unknown) {
-        const firebaseError = error as { code?: string; message?: string };
-        console.error('Popup sign-in error:', firebaseError);
-
-        if (
-          firebaseError.code === 'auth/popup-blocked' ||
-          firebaseError.code === 'auth/popup-closed-by-user' ||
-          firebaseError.code === 'auth/cancelled-popup-request'
-        ) {
-          try {
-            await signInWithRedirect(auth, googleProvider);
-          } catch (redirectError) {
-            console.error('Redirect sign-in error:', redirectError);
-            setAuthError('Unable to sign in. Please try again.');
-          }
-        } else {
-          setAuthError(firebaseError.message || 'Sign in failed. Please try again.');
-        }
-      }
-    }
-  };
-
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
@@ -155,44 +76,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const createHousehold = async (name: string) => {
-    if (!user) throw new Error('Must be logged in to create a household');
+    setAuthError(null);
 
     try {
-      const householdId = `household_${user.uid}_${Date.now()}`;
+      // Sign in anonymously if not already signed in
+      let currentUser = user;
+      if (!currentUser) {
+        const result = await signInAnonymously(auth);
+        currentUser = result.user;
+        setUser(currentUser);
+      }
+
+      const householdId = `household_${currentUser.uid}_${Date.now()}`;
       const householdData: Household = {
         id: householdId,
         name,
-        members: [user.uid],
-        createdBy: user.uid,
+        members: [currentUser.uid],
+        createdBy: currentUser.uid,
       };
 
       // Create household document
       await setDoc(doc(db, 'households', householdId), householdData);
 
-      // Update user with household reference
-      await setDoc(doc(db, 'users', user.uid), {
+      // Create/update user document with household reference
+      await setDoc(doc(db, 'users', currentUser.uid), {
+        createdAt: new Date().toISOString(),
         householdId,
       }, { merge: true });
 
       setHousehold(householdData);
     } catch (error) {
       console.error('Error creating household:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create household';
+      setAuthError(errorMessage);
       throw error;
     }
   };
 
   const joinHousehold = async (rawHouseholdId: string) => {
-    if (!user) throw new Error('Must be logged in to join a household');
+    setAuthError(null);
 
     // Sanitize the pasted code: remove whitespace, line breaks, invisible chars
     const householdId = rawHouseholdId
       .replace(/[\s\u200B\u200C\u200D\uFEFF\n\r\t]/g, '');
 
     if (!householdId) {
-      throw new Error('Please enter a valid household code');
+      const error = new Error('Please enter a valid household code');
+      setAuthError(error.message);
+      throw error;
     }
 
     try {
+      // Sign in anonymously if not already signed in
+      let currentUser = user;
+      if (!currentUser) {
+        const result = await signInAnonymously(auth);
+        currentUser = result.user;
+        setUser(currentUser);
+      }
+
       const householdRef = doc(db, 'households', householdId);
       const householdDoc = await getDoc(householdRef);
 
@@ -200,28 +142,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const codePreview = householdId.length > 50
           ? `${householdId.substring(0, 50)}...`
           : householdId;
-        throw new Error(
+        const error = new Error(
           `Household not found. Make sure the code is correct (it should start with "household_"). Code received: "${codePreview}"`
         );
+        setAuthError(error.message);
+        throw error;
       }
 
       const householdData = householdDoc.data() as Household;
 
       // Add user to household members if not already there
-      if (!householdData.members.includes(user.uid)) {
+      if (!householdData.members.includes(currentUser.uid)) {
         await setDoc(householdRef, {
-          members: [...householdData.members, user.uid],
+          members: [...householdData.members, currentUser.uid],
         }, { merge: true });
       }
 
-      // Update user with household reference
-      await setDoc(doc(db, 'users', user.uid), {
+      // Create/update user document with household reference
+      await setDoc(doc(db, 'users', currentUser.uid), {
+        createdAt: new Date().toISOString(),
         householdId,
       }, { merge: true });
 
       setHousehold({ ...householdData, id: householdId });
     } catch (error) {
       console.error('Error joining household:', error);
+      if (error instanceof Error && !authError) {
+        setAuthError(error.message);
+      }
       throw error;
     }
   };
@@ -233,7 +181,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         household,
         loading,
         authError,
-        signInWithGoogle,
         signOut,
         createHousehold,
         joinHousehold,
