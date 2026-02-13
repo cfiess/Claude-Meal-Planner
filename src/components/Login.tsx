@@ -46,9 +46,10 @@ export function Login() {
     }
     try {
       setError('');
-      await joinHousehold(joinCode.trim());
+      await joinHousehold(joinCode);
     } catch (err) {
-      setError('Failed to join household. Check the code and try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to join household. Check the code and try again.';
+      setError(errorMessage);
       console.error(err);
     }
   };

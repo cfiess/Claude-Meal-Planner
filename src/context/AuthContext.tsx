@@ -181,8 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Sanitize the pasted code: remove whitespace, line breaks, invisible chars
     const householdId = rawHouseholdId
-      .replace(/[\s\u200B\u200C\u200D\uFEFF\n\r\t]/g, '')
-      .trim();
+      .replace(/[\s\u200B\u200C\u200D\uFEFF\n\r\t]/g, '');
 
     if (!householdId) {
       throw new Error('Please enter a valid household code');
@@ -193,8 +192,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const householdDoc = await getDoc(householdRef);
 
       if (!householdDoc.exists()) {
+        const codePreview = householdId.length > 50
+          ? `${householdId.substring(0, 50)}...`
+          : householdId;
         throw new Error(
-          `Household not found. Make sure the code is correct (it should start with "household_"). Code received: "${householdId.substring(0, 30)}..."`
+          `Household not found. Make sure the code is correct (it should start with "household_"). Code received: "${codePreview}"`
         );
       }
 
