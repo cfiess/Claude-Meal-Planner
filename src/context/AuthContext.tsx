@@ -74,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user);
 
       if (user) {
+        // Ensure user document exists (handles redirect sign-in race condition)
+        await ensureUserDocument(user);
+
         // Check if user has a household
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
@@ -98,22 +101,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     setAuthError(null);
 
-    // Detect if we're on mobile/Safari where popups often fail
+    // Use redirect for ALL mobile devices - popups are unreliable on mobile
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    // Use redirect for mobile Safari, popup for others
-    if (isMobile && isSafari) {
+    if (isMobile) {
       try {
         await signInWithRedirect(auth, googleProvider);
       } catch (error) {
         console.error('Redirect sign-in error:', error);
         const firebaseError = error as { message?: string };
         setAuthError(firebaseError.message || 'Sign in failed. Please try again.');
-        throw error;
       }
     } else {
-      // Try popup first, fall back to redirect if blocked
+      // Desktop: try popup first, fall back to redirect if blocked
       try {
         const result = await signInWithPopup(auth, googleProvider);
         await ensureUserDocument(result.user);
@@ -121,7 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const firebaseError = error as { code?: string; message?: string };
         console.error('Popup sign-in error:', firebaseError);
 
-        // If popup was blocked, try redirect
         if (
           firebaseError.code === 'auth/popup-blocked' ||
           firebaseError.code === 'auth/popup-closed-by-user' ||
@@ -132,11 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch (redirectError) {
             console.error('Redirect sign-in error:', redirectError);
             setAuthError('Unable to sign in. Please try again.');
-            throw redirectError;
           }
         } else {
           setAuthError(firebaseError.message || 'Sign in failed. Please try again.');
-          throw error;
         }
       }
     }
@@ -179,15 +176,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const joinHousehold = async (householdId: string) => {
+  const joinHousehold = async (rawHouseholdId: string) => {
     if (!user) throw new Error('Must be logged in to join a household');
+
+    // Sanitize the pasted code: remove whitespace, line breaks, invisible chars
+    const householdId = rawHouseholdId
+      .replace(/[\s\u200B\u200C\u200D\uFEFF\n\r\t]/g, '')
+      .trim();
+
+    if (!householdId) {
+      throw new Error('Please enter a valid household code');
+    }
 
     try {
       const householdRef = doc(db, 'households', householdId);
       const householdDoc = await getDoc(householdRef);
 
       if (!householdDoc.exists()) {
-        throw new Error('Household not found');
+        throw new Error(
+          `Household not found. Make sure the code is correct (it should start with "household_"). Code received: "${householdId.substring(0, 30)}..."`
+        );
       }
 
       const householdData = householdDoc.data() as Household;

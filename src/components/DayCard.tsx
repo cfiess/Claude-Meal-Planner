@@ -207,8 +207,9 @@ export function DayCard({ day, label, date, plan, week }: DayCardProps) {
                 onChange={e => setNotesInput(e.target.value)}
                 onBlur={handleNotesBlur}
                 placeholder="Add notes..."
-                className="w-full px-2 py-1 text-sm border border-gray-200 rounded-md resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 mt-2 min-h-[3rem]"
-                style={{ height: 'auto', minHeight: `${Math.max(3, (notesInput.split('\n').length + 1) * 1.5)}rem` }}
+                className="w-full px-2 py-1 text-sm border border-gray-200 rounded-md resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 mt-2"
+                style={{ minHeight: `${Math.max(1.75, (notesInput.split('\n').length) * 1.5)}rem` }}
+                rows={1}
               />
             )}
             {!displayNotes && !showNotes && (
