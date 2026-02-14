@@ -22,7 +22,7 @@ const INITIAL_CATEGORIES = [
 
 export function Admin() {
   const { state, addTag, removeTag, updateTag, resetTimesCooked } = useMealPlanner();
-  const { household } = useAuth();
+  const { household, migrateHousehold } = useAuth();
 
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editingTagName, setEditingTagName] = useState('');
@@ -30,6 +30,9 @@ export function Admin() {
   const [showAddTag, setShowAddTag] = useState(false);
   const [activeSection, setActiveSection] = useState<'tags' | 'categories' | 'history' | 'analytics' | 'data' | 'household'>('analytics');
   const [copied, setCopied] = useState(false);
+  const [newHouseholdCode, setNewHouseholdCode] = useState('');
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationError, setMigrationError] = useState('');
 
   // Shopping history (cumulative counts)
   const [shoppingHistory, setShoppingHistory] = useState<Record<string, number>>(() => {
@@ -114,6 +117,40 @@ export function Admin() {
   const handleResetTimesCooked = () => {
     if (confirm('Reset all meal counts to 0? This will clear the "Times Made" for all recipes.')) {
       resetTimesCooked();
+    }
+  };
+
+  const handleMigrateHousehold = async () => {
+    const trimmedCode = newHouseholdCode.trim();
+    if (!trimmedCode) {
+      setMigrationError('Please enter a new household code');
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to change your household code to "${trimmedCode}"?\n\n` +
+      `This will:\n` +
+      `• Create a new household with code "${trimmedCode}"\n` +
+      `• Copy all your recipes and meal plans\n` +
+      `• Update all household members\n` +
+      `• Delete the old household data\n\n` +
+      `Make sure ALL household members save the new code!`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      setMigrationError('');
+      setIsMigrating(true);
+      await migrateHousehold(trimmedCode);
+      alert(`Migration successful! Your new household code is: ${trimmedCode}\n\nMake sure to share this with all household members!`);
+      setNewHouseholdCode('');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to migrate household';
+      setMigrationError(errorMessage);
+      console.error(err);
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -504,6 +541,60 @@ export function Admin() {
             <p className="text-xs text-gray-500 mt-2">
               They'll need to sign in and paste this code to join.
             </p>
+          </div>
+
+          {/* Migration Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Change Household Code</h3>
+            <p className="text-gray-600 mb-4">
+              Want a simpler, more memorable code? You can change your household code here.
+              This will copy all your data to the new code.
+            </p>
+
+            {migrationError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
+                {migrationError}
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-blue-800 text-sm font-medium mb-2">Current code:</p>
+              <code className="text-blue-900 font-mono text-sm">{household.id}</code>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Household Code
+                </label>
+                <input
+                  type="text"
+                  value={newHouseholdCode}
+                  onChange={(e) => setNewHouseholdCode(e.target.value)}
+                  placeholder="e.g., fiess, smith-family, etc."
+                  className="w-full px-4 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isMigrating}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Only letters, numbers, hyphens, and underscores. Will be converted to lowercase.
+                </p>
+              </div>
+
+              <button
+                onClick={handleMigrateHousehold}
+                disabled={isMigrating || !newHouseholdCode.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isMigrating ? 'Migrating...' : 'Change Household Code'}
+              </button>
+            </div>
+
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                <strong>Important:</strong> After migration, all household members will need to use
+                the NEW code to access the household. Make sure to share it with everyone!
+              </p>
+            </div>
           </div>
         </div>
       )}

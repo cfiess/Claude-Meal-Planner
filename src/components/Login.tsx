@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 export function Login() {
   const { household, authError, createHousehold, joinHousehold } = useAuth();
   const [householdName, setHouseholdName] = useState('');
+  const [customCode, setCustomCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [showJoin, setShowJoin] = useState(false);
   const [error, setError] = useState('');
@@ -20,7 +21,7 @@ export function Login() {
     try {
       setError('');
       setIsLoading(true);
-      await createHousehold(householdName.trim());
+      await createHousehold(householdName.trim(), customCode.trim() || undefined);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create household. Please try again.';
       setError(errorMessage);
@@ -81,6 +82,22 @@ export function Login() {
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isLoading}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Custom Code (Optional)
+              </label>
+              <input
+                type="text"
+                value={customCode}
+                onChange={(e) => setCustomCode(e.target.value)}
+                placeholder="e.g., fiess, smith-family"
+                className="w-full px-4 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave empty for an auto-generated code. Only letters, numbers, hyphens, and underscores.
+              </p>
             </div>
             <button
               onClick={handleCreateHousehold}

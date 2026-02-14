@@ -5,7 +5,7 @@ import {
   onAuthStateChanged,
   type User
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 interface Household {
@@ -21,8 +21,9 @@ interface AuthContextType {
   loading: boolean;
   authError: string | null;
   signOut: () => Promise<void>;
-  createHousehold: (name: string) => Promise<void>;
+  createHousehold: (name: string, customCode?: string) => Promise<void>;
   joinHousehold: (householdId: string) => Promise<void>;
+  migrateHousehold: (newHouseholdId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createHousehold = async (name: string) => {
+  const createHousehold = async (name: string, customCode?: string) => {
     setAuthError(null);
 
     try {
@@ -98,7 +99,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const householdId = `household_${currentUser.uid}_${Date.now()}`;
+      // Use custom code if provided, otherwise generate one
+      const householdId = customCode
+        ? customCode.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-')
+        : `household_${currentUser.uid}_${Date.now()}`;
+
+      // Check if custom code already exists
+      if (customCode) {
+        const existingDoc = await getDoc(doc(db, 'households', householdId));
+        if (existingDoc.exists()) {
+          throw new Error(`Household code "${householdId}" is already taken. Please choose another.`);
+        }
+      }
+
       const householdData: Household = {
         id: householdId,
         name,
@@ -196,6 +209,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const migrateHousehold = async (rawNewHouseholdId: string) => {
+    if (!household || !user) {
+      throw new Error('Must be signed in with an existing household to migrate');
+    }
+
+    setAuthError(null);
+
+    // Sanitize and validate the new household ID
+    const newHouseholdId = rawNewHouseholdId
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, '-');
+
+    if (!newHouseholdId) {
+      throw new Error('Please enter a valid household code');
+    }
+
+    if (newHouseholdId === household.id) {
+      throw new Error('New code must be different from current code');
+    }
+
+    try {
+      // 1. Check if new ID is available
+      const newHouseholdRef = doc(db, 'households', newHouseholdId);
+      const existingDoc = await getDoc(newHouseholdRef);
+      if (existingDoc.exists()) {
+        throw new Error(`Household code "${newHouseholdId}" is already taken. Please choose another.`);
+      }
+
+      const oldHouseholdId = household.id;
+
+      // 2. Copy household document to new ID
+      const newHouseholdData = { ...household, id: newHouseholdId };
+      await setDoc(newHouseholdRef, newHouseholdData);
+
+      // 3. Copy all subcollection data (like mealPlanner)
+      const oldDataRef = doc(db, 'households', oldHouseholdId, 'data', 'mealPlanner');
+      const oldDataDoc = await getDoc(oldDataRef);
+
+      if (oldDataDoc.exists()) {
+        const newDataRef = doc(db, 'households', newHouseholdId, 'data', 'mealPlanner');
+        await setDoc(newDataRef, oldDataDoc.data());
+      }
+
+      // 4. Update all member user documents to point to new household
+      for (const memberId of household.members) {
+        await setDoc(doc(db, 'users', memberId), {
+          householdId: newHouseholdId,
+        }, { merge: true });
+      }
+
+      // 5. Delete old household data (optional - comment out if you want to keep backup)
+      await deleteDoc(doc(db, 'households', oldHouseholdId, 'data', 'mealPlanner'));
+      await deleteDoc(doc(db, 'households', oldHouseholdId));
+
+      // 6. Update local state
+      setHousehold(newHouseholdData);
+
+    } catch (error) {
+      console.error('Error migrating household:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to migrate household';
+      setAuthError(errorMessage);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -206,6 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         createHousehold,
         joinHousehold,
+        migrateHousehold,
       }}
     >
       {children}
