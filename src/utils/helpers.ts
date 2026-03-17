@@ -11,7 +11,7 @@ function toLocalISODate(date: Date): string {
 }
 
 // Parse a YYYY-MM-DD string as local midnight (not UTC midnight)
-function parseLocalDate(dateString: string): Date {
+export function parseLocalDate(dateString: string): Date {
   const [year, month, day] = dateString.split('-').map(Number);
   return new Date(year, month - 1, day);
 }

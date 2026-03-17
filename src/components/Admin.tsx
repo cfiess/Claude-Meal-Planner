@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMealPlanner } from '../context/MealPlannerContext';
 import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../version';
+import { parseLocalDate } from '../utils/helpers';
 
 const CATEGORIES_KEY = 'shopping-list-categories';
 const CATEGORY_OVERRIDES_KEY = 'shopping-list-category-overrides';
@@ -437,7 +438,7 @@ export function Admin() {
                   className="bg-white p-4 rounded-lg border border-gray-200"
                 >
                   <h4 className="font-medium text-gray-800 mb-2">
-                    Week of {new Date(week.weekStartDate).toLocaleDateString('en-US', {
+                    Week of {parseLocalDate(week.weekStartDate).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
