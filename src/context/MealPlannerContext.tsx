@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './AuthContext';
 import type { Recipe, WeekPlan, DayOfWeek, DayMeal, MealPlannerState } from '../types';
-import { getMonday, getNextMonday, generateId } from '../utils/helpers';
+import { getMondayString, getNextMondayString, generateId } from '../utils/helpers';
 
 const DEFAULT_TAGS = [
   'quick',
@@ -34,8 +34,8 @@ function createEmptyWeek(weekStartDate: string): WeekPlan {
 }
 
 function getDefaultState(): MealPlannerState {
-  const currentMonday = getMonday(new Date()).toISOString().split('T')[0];
-  const nextMonday = getNextMonday(new Date()).toISOString().split('T')[0];
+  const currentMonday = getMondayString(new Date());
+  const nextMonday = getNextMondayString(new Date());
   return {
     recipes: [],
     currentWeek: createEmptyWeek(currentMonday),
@@ -298,8 +298,8 @@ export function MealPlannerProvider({ children }: { children: ReactNode }) {
         }
 
         lastSavedState.current = dataString;
-        const currentMonday = getMonday(new Date()).toISOString().split('T')[0];
-        const nextMonday = getNextMonday(new Date()).toISOString().split('T')[0];
+        const currentMonday = getMondayString(new Date());
+        const nextMonday = getNextMondayString(new Date());
 
         // Check if we need to transition weeks
         if (data.currentWeek.weekStartDate !== currentMonday) {
