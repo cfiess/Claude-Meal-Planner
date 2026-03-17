@@ -5,7 +5,7 @@ import {
   onAuthStateChanged,
   type User
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 interface Household {
